@@ -1,0 +1,244 @@
+/* Oil Spill Detection - Orbital SAR Intelligence Design Tokens */
+/* Dark theme first — mission control aesthetic */
+
+@import "tailwindcss";
+
+/* Google Fonts - Space Grotesk, Inter, IBM Plex Mono */
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap');
+
+:root {
+  /* Core Palette - Abyss/Deep ocean from orbit */
+  --abyss: #05080F;
+  --deep: #0A1626;
+  --steel: #13233B;
+  --steel-hover: #1A2E4A;
+
+  /* Signal Colors - Radar telemetry */
+  --signal: #38E1D0;
+  --signal-dim: #2BC4B6;
+  --signal-glow: rgba(56, 225, 208, 0.4);
+
+  /* Alert/Accent - Spill detection */
+  --amber: #FFB020;
+  --amber-dim: #E6A020;
+  --amber-glow: rgba(255, 176, 32, 0.4);
+
+  /* Iridescent Oil Sheen - The surreal accent */
+  --sheen: #9B6DFF;
+  --sheen-dim: #7B5FD4;
+  --sheen-glow: rgba(155, 109, 255, 0.4);
+
+  /* Text Hierarchy */
+  --ice: #E6EDF3;
+  --ice-dim: #C8D4E0;
+  --mute: #8CA0B3;
+  --mute-dim: #6A7F94;
+
+  /* Semantic Mappings */
+  --color-bg-primary: var(--abyss);
+  --color-bg-secondary: var(--deep);
+  --color-bg-tertiary: var(--steel);
+  --color-bg-tertiary-hover: var(--steel-hover);
+
+  --color-text-primary: var(--ice);
+  --color-text-secondary: var(--ice-dim);
+  --color-text-tertiary: var(--mute);
+  --color-text-muted: var(--mute-dim);
+
+  --color-accent-primary: var(--signal);
+  --color-accent-primary-dim: var(--signal-dim);
+  --color-accent-alert: var(--amber);
+  --color-accent-alert-dim: var(--amber-dim);
+  --color-accent-sheen: var(--sheen);
+  --color-accent-sheen-dim: var(--sheen-dim);
+
+  --color-border: rgba(140, 160, 179, 0.2);
+  --color-border-focus: var(--signal);
+
+  /* Elevation/Glow System */
+  --glow-signal: 0 0 20px rgba(56, 225, 208, 0.3);
+  --glow-signal-sm: 0 0 10px rgba(56, 225, 208, 0.2);
+  --glow-amber: 0 0 20px rgba(255, 176, 32, 0.3);
+  --glow-sheen: 0 0 30px rgba(155, 109, 255, 0.25);
+
+  /* Surfaces */
+  --surface-elevated: 0 4px 20px rgba(0, 0, 0, 0.4);
+  --surface-panel: 0 2px 12px rgba(0, 0, 0, 0.3);
+
+  /* Radius */
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+
+  /* Motion */
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+  --duration-fast: 150ms;
+  --duration-normal: 250ms;
+  --duration-slow: 400ms;
+  --duration-slower: 600ms;
+}
+
+/* Tailwind v4 Theme Integration */
+@theme {
+  /* Colors */
+  --color-abyss: var(--abyss);
+  --color-deep: var(--deep);
+  --color-steel: var(--steel);
+  --color-steel-hover: var(--steel-hover);
+
+  --color-signal: var(--signal);
+  --color-signal-dim: var(--signal-dim);
+  --color-signal-glow: var(--signal-glow);
+
+  --color-amber: var(--amber);
+  --color-amber-dim: var(--amber-dim);
+  --color-amber-glow: var(--amber-glow);
+
+  --color-sheen: var(--sheen);
+  --color-sheen-dim: var(--sheen-dim);
+  --color-sheen-glow: var(--sheen-glow);
+
+  --color-ice: var(--ice);
+  --color-ice-dim: var(--ice-dim);
+  --color-mute: var(--mute);
+  --color-mute-dim: var(--mute-dim);
+
+  /* Semantic mappings available as Tailwind classes */
+  --color-bg-primary: var(--color-bg-primary);
+  --color-bg-secondary: var(--color-bg-secondary);
+  --color-bg-tertiary: var(--color-bg-tertiary);
+
+  --color-text-primary: var(--color-text-primary);
+  --color-text-secondary: var(--color-text-secondary);
+  --color-text-tertiary: var(--color-text-tertiary);
+  --color-text-muted: var(--color-text-muted);
+
+  /* Typography */
+  --font-display: 'Space Grotesk', 'Geist', sans-serif;
+  --font-body: 'Inter', 'Geist', system-ui, sans-serif;
+  --font-mono: 'IBM Plex Mono', 'JetBrains Mono', monospace;
+  --font-geist: 'Geist', sans-serif;
+}
+
+/* Base Styles */
+html {
+  background-color: var(--abyss);
+  color: var(--ice);
+  font-family: var(--font-body);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  background-color: var(--abyss);
+  min-height: 100vh;
+}
+
+/* Typography Classes */
+.font-display {
+  font-family: var(--font-display);
+}
+
+.font-body {
+  font-family: var(--font-body);
+}
+
+.font-mono {
+  font-family: var(--font-mono);
+}
+
+/* All numeric data uses mono */
+.data-mono {
+  font-family: var(--font-mono);
+  font-feature-settings: 'tnum' 1;
+}
+
+/* Glow Utilities */
+.glow-signal {
+  box-shadow: var(--glow-signal);
+}
+
+.glow-signal-sm {
+  box-shadow: var(--glow-signal-sm);
+}
+
+.glow-amber {
+  box-shadow: var(--glow-amber);
+}
+
+.glow-sheen {
+  box-shadow: var(--glow-sheen);
+}
+
+.text-glow-signal {
+  text-shadow: 0 0 20px var(--signal-glow);
+}
+
+.text-glow-amber {
+  text-shadow: 0 0 20px var(--amber-glow);
+}
+
+/* Surface Styles */
+.surface-elevated {
+  box-shadow: var(--surface-elevated);
+}
+
+.surface-panel {
+  box-shadow: var(--surface-panel);
+}
+
+/* Focus States - Always visible */
+*:focus-visible {
+  outline: 2px solid var(--signal);
+  outline-offset: 2px;
+}
+
+/* Scrollbar Styling */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--abyss);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--steel);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--mute-dim);
+}
+
+/* Reduced Motion */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* Selection */
+::selection {
+  background-color: var(--signal);
+  color: var(--abyss);
+}
+
+/* FoldHero Animations */
+@keyframes fadeSlideUp {
+  from {
+    opacity: 0;
+    transform: translateY(24px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}

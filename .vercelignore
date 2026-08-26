@@ -1,0 +1,40 @@
+# Git-related
+.git/
+.gitignore
+
+# Dependencies
+node_modules/
+package-lock.json
+
+# Build artifacts
+dist/
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# Development
+*.log
+*.pid
+*.seed
+*.pid.lock
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Memory
+.claude/
+.remember/
+
+# Test files
+coverage/
+.nyc_output/

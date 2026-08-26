@@ -1,0 +1,49 @@
+# Dependencies
+node_modules/
+
+# Build artifacts
+dist/
+build/
+*.tsbuildinfo
+vite.config.js
+vite.config.d.ts
+vite.config.js.map
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# Development
+*.log
+*.pid
+*.seed
+*.pid.lock
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Memory / tools
+.claude/
+.remember/
+.playwright-mcp/
+
+# Playwright / screenshots
+*.png
+page-*.md
+page-snapshot.md
+
+# Test files
+coverage/
+.nyc_output/
+
+# Vercel
+.vercel/
