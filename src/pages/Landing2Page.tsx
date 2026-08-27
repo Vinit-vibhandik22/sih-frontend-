@@ -7,90 +7,81 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { ArrowRight, ArrowDown, ChevronUp, X, Radar, AlertTriangle, Crosshair } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import Lenis from 'lenis';
 
 const DARK = '#1D3045';
 const SIGNAL = '#38E1D0';
 const VIDEO_URL = 'https://d8j0ntlcm91z4.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/hf_20260821_114821_a8ca298f-be2c-4613-a4dd-51b69e16bbde.mp4';
 
-// Smooth scroll constants
-const LERP_TAU = 8;
-const SNAP = 0.002;
-
-// Custom hook for scroll-tied video scrubbing
+// Custom hook for scroll-tied video scrubbing with Lenis
 function useVideoScrub() {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
+  const lenisRef = useRef<Lenis | null>(null);
   const [scrollProgress, setScrollProgress] = useState(0);
   const [videoDuration, setVideoDuration] = useState(0);
-  const currentTimeRef = useRef(0);
-  const targetTimeRef = useRef(0);
   const rafRef = useRef<number | null>(null);
-  const lastTimeRef = useRef(0);
 
-  const getProgress = useCallback(() => {
-    if (!containerRef.current) return 0;
-    const containerHeight = containerRef.current.offsetHeight;
-    const scrollY = window.scrollY;
-    const p = Math.max(0, Math.min(1, scrollY / (containerHeight - window.innerHeight)));
-    return p;
-  }, []);
-
-  const tick = useCallback((timestamp: number) => {
-    if (!lastTimeRef.current) lastTimeRef.current = timestamp;
-    const delta = Math.min(0.1, (timestamp - lastTimeRef.current) / 1000);
-    lastTimeRef.current = timestamp;
-
-    const p = getProgress();
-    setScrollProgress(p);
-
-    if (videoDuration > 0 && videoRef.current) {
-      targetTimeRef.current = p * videoDuration;
-
-      const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-
-      if (prefersReducedMotion) {
-        currentTimeRef.current = targetTimeRef.current;
-      } else {
-        const diff = targetTimeRef.current - currentTimeRef.current;
-        currentTimeRef.current += diff * (1 - Math.exp(-delta * LERP_TAU));
-        if (Math.abs(diff) < SNAP) {
-          currentTimeRef.current = targetTimeRef.current;
-        }
-      }
-
-      const video = videoRef.current;
-      if (!video.seeking && Math.abs(video.currentTime - currentTimeRef.current) > 0.05) {
-        video.currentTime = currentTimeRef.current;
-      }
-    }
-
-    rafRef.current = requestAnimationFrame(tick);
-  }, [videoDuration, getProgress]);
-
+  // Initialize Lenis smooth scroll
   useEffect(() => {
-    rafRef.current = requestAnimationFrame(tick);
+    const lenis = new Lenis({
+      duration: 1.2,
+      easing: (t) => Math.min(1, 1.001 - Math.pow(2, -10 * t)),
+      orientation: 'vertical',
+      gestureOrientation: 'vertical',
+      smoothWheel: true,
+      wheelMultiplier: 1,
+      touchMultiplier: 2,
+    });
+
+    lenisRef.current = lenis;
+
+    const onScroll = ({ scroll, limit }: { scroll: number; limit: number }) => {
+      const progress = limit > 0 ? scroll / limit : 0;
+      setScrollProgress(progress);
+    };
+
+    lenis.on('scroll', onScroll);
+
+    // Animation frame loop for Lenis
+    const raf = (time: number) => {
+      lenis.raf(time);
+      rafRef.current = requestAnimationFrame(raf);
+    };
+    rafRef.current = requestAnimationFrame(raf);
+
     return () => {
       if (rafRef.current) cancelAnimationFrame(rafRef.current);
+      lenis.destroy();
     };
-  }, [tick]);
+  }, []);
 
+  // Sync video time with scroll progress
   useEffect(() => {
-    const handleResize = () => setScrollProgress(getProgress());
-    window.addEventListener('resize', handleResize);
-    window.addEventListener('orientationchange', handleResize);
-    return () => {
-      window.removeEventListener('resize', handleResize);
-      window.removeEventListener('orientationchange', handleResize);
-    };
-  }, [getProgress]);
+    if (!videoRef.current || !videoDuration) return;
 
-  return { videoRef, containerRef, scrollProgress, setVideoDuration };
-}
+    const video = videoRef.current;
+    const targetTime = scrollProgress * videoDuration;
 
-// Scroll to section helper
-function scrollToSection(progress: number) {
-  const targetScroll = progress * (document.body.scrollHeight - window.innerHeight);
-  window.scrollTo({ top: targetScroll, behavior: 'smooth' });
+    // Smooth video seeking with LERP for 60fps feel
+    const currentTime = video.currentTime;
+    const diff = targetTime - currentTime;
+    if (Math.abs(diff) > 0.01) {
+      // Set video time directly but with small steps for smoothness
+      const newTime = currentTime + diff * 0.15;
+      if (!video.seeking) {
+        video.currentTime = newTime;
+      }
+    }
+  }, [scrollProgress, videoDuration]);
+
+  const scrollTo = useCallback((progress: number) => {
+    if (!lenisRef.current || !containerRef.current) return;
+    const limit = containerRef.current.offsetHeight - window.innerHeight;
+    lenisRef.current.scrollTo(progress * limit, { duration: 1.5 });
+  }, []);
+
+  return { videoRef, containerRef, scrollProgress, setVideoDuration, scrollTo, lenisRef };
 }
 
 // ============================================================================
@@ -98,7 +89,19 @@ function scrollToSection(progress: number) {
 // ============================================================================
 
 // Navbar Component
-function Navbar({ progress, isMenuOpen, setIsMenuOpen, onLaunchApp }: { progress: number; isMenuOpen: boolean; setIsMenuOpen: (v: boolean) => void; onLaunchApp: () => void }) {
+function Navbar({
+  progress,
+  isMenuOpen,
+  setIsMenuOpen,
+  onLaunchApp,
+  onScrollTo,
+}: {
+  progress: number;
+  isMenuOpen: boolean;
+  setIsMenuOpen: (v: boolean) => void;
+  onLaunchApp: () => void;
+  onScrollTo: (p: number) => void;
+}) {
   const isLight = progress <= 0.55;
   const navColor = isLight ? DARK : '#ffffff';
 
@@ -115,17 +118,20 @@ function Navbar({ progress, isMenuOpen, setIsMenuOpen, onLaunchApp }: { progress
         style={{ color: navColor }}
       >
         {/* Logo */}
-        <div className="flex items-center gap-3 cursor-default">
+        <button
+          onClick={() => onScrollTo(0)}
+          className="flex items-center gap-3 hover:opacity-80 transition-opacity"
+        >
           <Radar size={28} style={{ color: isLight ? DARK : SIGNAL }} />
           <span className="text-sm tracking-[0.2em] uppercase font-medium">Orbital SAR</span>
-        </div>
+        </button>
 
         {/* Desktop Navigation */}
         <div className="hidden lg:flex items-center gap-8 xl:gap-10">
           {['DETECTION', 'ATTRIBUTION', 'ANALYTICS', 'PLATFORM'].map((label, i) => (
             <button
               key={label}
-              onClick={() => scrollToSection(i * 0.25)}
+              onClick={() => onScrollTo(i * 0.25)}
               className={`text-xs tracking-[0.15em] uppercase font-medium hover:opacity-70 relative transition-all duration-500 ${
                 i === 0 ? 'after:absolute after:bottom-[-12px] after:left-0 after:right-0 after:h-[2px] after:bg-current' : ''
               }`}
@@ -222,7 +228,7 @@ function Navbar({ progress, isMenuOpen, setIsMenuOpen, onLaunchApp }: { progress
               <button
                 key={label}
                 onClick={() => {
-                  scrollToSection(i * 0.2);
+                  onScrollTo(i * 0.2);
                   setIsMenuOpen(false);
                 }}
                 className={`px-8 sm:px-12 py-3 text-2xl tracking-wide uppercase transition-all duration-500 ${
@@ -244,7 +250,7 @@ function Navbar({ progress, isMenuOpen, setIsMenuOpen, onLaunchApp }: { progress
             <button onClick={onLaunchApp} className="text-xs tracking-[0.2em] uppercase text-white/60 hover:text-white transition-colors">
               ALERTS
             </button>
-            <button onClick={() => { window.scrollTo({ top: 0, behavior: 'smooth' }); setIsMenuOpen(false); }} className="text-xs tracking-[0.2em] uppercase text-white/60 hover:text-white transition-colors">
+            <button onClick={() => { onScrollTo(0); setIsMenuOpen(false); }} className="text-xs tracking-[0.2em] uppercase text-white/60 hover:text-white transition-colors">
               TOP
             </button>
           </div>
@@ -310,7 +316,15 @@ function Section1({ opacity, onLaunch }: { opacity: number; onLaunch: () => void
 }
 
 // Section 2 - Center
-function Section2({ opacity, onScrollDown, onScrollUp }: { opacity: number; onScrollDown: () => void; onScrollUp: () => void }) {
+function Section2({
+  opacity,
+  onScrollDown,
+  onScrollUp,
+}: {
+  opacity: number;
+  onScrollDown: () => void;
+  onScrollUp: () => void;
+}) {
   const staggerVisible = opacity > 0.3;
 
   return (
@@ -456,7 +470,7 @@ function Section3({ opacity, onLaunch }: { opacity: number; onLaunch: () => void
 
 export default function Landing2Page() {
   const navigate = useNavigate();
-  const { videoRef, containerRef, scrollProgress, setVideoDuration } = useVideoScrub();
+  const { videoRef, containerRef, scrollProgress, setVideoDuration, scrollTo } = useVideoScrub();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
 
   // Calculate section opacities based on scroll progress
@@ -464,30 +478,21 @@ export default function Landing2Page() {
   const s2Opacity = scrollProgress < 0.32 ? 0 : scrollProgress < 0.40 ? (scrollProgress - 0.32) / 0.08 : scrollProgress < 0.55 ? 1 : Math.max(0, 1 - (scrollProgress - 0.55) / 0.08);
   const s3Opacity = scrollProgress < 0.67 ? 0 : scrollProgress < 0.75 ? (scrollProgress - 0.67) / 0.08 : 1;
 
-  // Navigation handlers
+  // Navigation handlers using Lenis
   const launchApp = useCallback(() => navigate('/app'), [navigate]);
-  const scrollDown = useCallback(() => scrollToSection(Math.min(1, scrollProgress + 0.25)), [scrollProgress]);
-  const scrollUp = useCallback(() => scrollToSection(Math.max(0, scrollProgress - 0.25)), [scrollProgress]);
+  const scrollDown = useCallback(() => scrollTo(Math.min(1, scrollProgress + 0.25)), [scrollProgress, scrollTo]);
+  const scrollUp = useCallback(() => scrollTo(Math.max(0, scrollProgress - 0.25)), [scrollProgress, scrollTo]);
 
-  // Prevent body scroll when menu is open, and set overflow-x hidden
+  // Prevent body scroll when menu is open
+  const { lenisRef } = useVideoScrub();
   useEffect(() => {
-    document.body.style.overflowX = 'hidden';
-    return () => {
-      document.body.style.overflowX = '';
-    };
-  }, []);
-
-  useEffect(() => {
+    if (!lenisRef.current) return;
     if (isMenuOpen) {
-      document.body.style.overflow = 'hidden';
+      lenisRef.current.stop();
     } else {
-      document.body.style.overflowX = 'hidden';
+      lenisRef.current.start();
     }
-    return () => {
-      document.body.style.overflow = '';
-      document.body.style.overflowX = '';
-    };
-  }, [isMenuOpen]);
+  }, [isMenuOpen, lenisRef]);
 
   // Video loaded metadata
   const handleLoadedMetadata = () => {
@@ -521,6 +526,7 @@ export default function Landing2Page() {
             isMenuOpen={isMenuOpen}
             setIsMenuOpen={setIsMenuOpen}
             onLaunchApp={launchApp}
+            onScrollTo={scrollTo}
           />
           <Section1 opacity={s1Opacity} onLaunch={launchApp} />
           <Section2 opacity={s2Opacity} onScrollDown={scrollDown} onScrollUp={scrollUp} />
