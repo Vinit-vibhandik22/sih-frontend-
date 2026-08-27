@@ -263,7 +263,14 @@ export const RouteMap = ({ onObjectSelect }: RouteMapProps) => {
           pitch: viewState.pitch || 0,
           bearing: viewState.bearing || 0,
         }}
-        onViewStateChange={({ viewState: vs }) => setViewState(vs as ViewState)}
+        onViewStateChange={({ viewState: vs }) => {
+          // Prevent infinite loop by checking if values actually changed
+          if (vs.longitude !== viewState.longitude ||
+              vs.latitude !== viewState.latitude ||
+              vs.zoom !== viewState.zoom) {
+            setViewState(vs as ViewState);
+          }
+        }}
         getCursor={() => cursor}
       >
         <Map
