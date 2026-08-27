@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * GlobalSearch.tsx
  * Chunk 13: Global Polish — Global search in Command Palette

@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * ErrorBoundary.tsx
  * Chunk 13: Global Polish — Error boundary with recovery

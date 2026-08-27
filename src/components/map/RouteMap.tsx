@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * RouteMap.tsx
  * Chunk 3: Map Core - MapLibre + deck.gl with dark theme

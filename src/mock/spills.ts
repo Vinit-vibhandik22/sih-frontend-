@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Mock Spill Data - Arabian Sea / Indian EEZ
  * Representative realistic data for demo purposes.

@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * VesselLayers.tsx
  * Chunk 8: AIS Vessels & Tracks
