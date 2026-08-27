@@ -370,7 +370,7 @@ export const SuspectRanking = ({
               <p className="font-mono text-[9px] text-mute-dim leading-relaxed">
                 Scores represent correlation strength, not certainty. Final attribution
                 requires human review and additional evidence. Confidence levels:
-                <span className="text-signal"> High (>80)</span>,
+                <span className="text-signal"> High (&gt;80)</span>,
                 <span className="text-amber"> Medium (60-80)</span>,
                 <span className="text-mute"> Low (&lt;60)</span>.
               </p>
