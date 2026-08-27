@@ -26,6 +26,7 @@ interface UIState {
   commandPaletteOpen: boolean;
   keyboardShortcutsOpen: boolean;
   activeAOI: string | null;
+  selectedSatellitePass: string | null;
   setPanelCollapsed: (side: PanelSide, collapsed: boolean) => void;
   setPanelSize: (side: PanelSide, size: number) => void;
   setPanelTab: (side: PanelSide, tab: string) => void;
@@ -33,6 +34,7 @@ interface UIState {
   closeCommandPalette: () => void;
   toggleKeyboardShortcuts: () => void;
   setActiveAOI: (aoi: string | null) => void;
+  setSelectedSatellitePass: (pass: string | null) => void;
 }
 
 const createInitialState = (): UIState['panels'] => ({
@@ -100,6 +102,9 @@ export const useUIStore = create<UIState>()(
 
       activeAOI: null,
       setActiveAOI: (aoi) => set({ activeAOI: aoi }),
+
+      selectedSatellitePass: null,
+      setSelectedSatellitePass: (pass) => set({ selectedSatellitePass: pass }),
     }),
     {
       name: 'orbital-sar-ui',
