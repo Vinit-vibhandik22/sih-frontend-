@@ -2,10 +2,11 @@
  * Landing2Page.tsx
  * Cinematic scroll-tied video landing page - Orbital SAR Edition
  * Vite + React 18 + TypeScript + Tailwind CSS 3
+ * Mobile-optimized with touch gestures and responsive layouts
  */
 
 import { useEffect, useRef, useState, useCallback } from 'react';
-import { ArrowRight, ArrowDown, ChevronUp, X, Radar, AlertTriangle, Crosshair } from 'lucide-react';
+import { ArrowRight, ArrowDown, ChevronUp, X, Radar, AlertTriangle, Crosshair, ChevronDown } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import Lenis from 'lenis';
 
@@ -67,7 +68,6 @@ function useVideoScrub() {
     const currentTime = video.currentTime;
     const diff = targetTime - currentTime;
     if (Math.abs(diff) > 0.01) {
-      // Set video time directly but with small steps for smoothness
       const newTime = currentTime + diff * 0.15;
       if (!video.seeking) {
         video.currentTime = newTime;
@@ -82,6 +82,18 @@ function useVideoScrub() {
   }, []);
 
   return { videoRef, containerRef, scrollProgress, setVideoDuration, scrollTo, lenisRef };
+}
+
+// Hook for detecting touch devices
+function useIsMobile() {
+  const [isMobile, setIsMobile] = useState(false);
+  useEffect(() => {
+    const check = () => setIsMobile(window.matchMedia('(pointer: coarse), (max-width: 768px)').matches);
+    check();
+    window.addEventListener('resize', check);
+    return () => window.removeEventListener('resize', check);
+  }, []);
+  return isMobile;
 }
 
 // ============================================================================
@@ -114,16 +126,16 @@ function Navbar({
   return (
     <>
       <nav
-        className="absolute top-0 left-0 right-0 z-50 px-6 sm:px-8 md:px-12 pt-8 sm:pt-12 pb-6 flex items-center justify-between pointer-events-auto transition-colors duration-500"
+        className="absolute top-0 left-0 right-0 z-50 px-4 sm:px-6 md:px-12 pt-6 sm:pt-8 md:pt-12 pb-4 sm:pb-6 flex items-center justify-between pointer-events-auto transition-colors duration-500"
         style={{ color: navColor }}
       >
         {/* Logo */}
         <button
           onClick={() => onScrollTo(0)}
-          className="flex items-center gap-3 hover:opacity-80 transition-opacity"
+          className="flex items-center gap-2 sm:gap-3 hover:opacity-80 transition-opacity"
         >
-          <Radar size={28} style={{ color: isLight ? DARK : SIGNAL }} />
-          <span className="text-sm tracking-[0.2em] uppercase font-medium">Orbital SAR</span>
+          <Radar size={22} className="sm:w-7 sm:h-7" style={{ color: isLight ? DARK : SIGNAL }} />
+          <span className="text-xs sm:text-sm tracking-[0.15em] sm:tracking-[0.2em] uppercase font-medium">Orbital SAR</span>
         </button>
 
         {/* Desktop Navigation */}
@@ -149,7 +161,7 @@ function Navbar({
 
         {/* Mobile hamburger */}
         <button
-          className="lg:hidden flex flex-col gap-[5px] p-2"
+          className="lg:hidden flex flex-col gap-[4px] sm:gap-[5px] p-2 -mr-2"
           onClick={() => setIsMenuOpen(true)}
           aria-label="Open menu"
         >
@@ -158,7 +170,7 @@ function Navbar({
               key={i}
               className="block bg-current"
               style={{
-                width: i === 2 ? '16px' : '24px',
+                width: i === 2 ? '14px' : '20px',
                 height: '2px',
                 transition: 'all 0.3s ease',
               }}
@@ -166,9 +178,9 @@ function Navbar({
           ))}
         </button>
 
-        {/* Right cluster */}
+        {/* Right cluster - desktop */}
         <div
-          className="hidden sm:flex items-center gap-6"
+          className="hidden lg:flex items-center gap-6"
           style={{
             opacity: mounted ? 1 : 0,
             transform: mounted ? 'translateY(0)' : 'translateY(6px)',
@@ -187,13 +199,7 @@ function Navbar({
           </button>
           <button
             onClick={() => setIsMenuOpen(true)}
-            className="hidden lg:block text-xs tracking-[0.2em] uppercase font-medium hover:opacity-70 cursor-pointer">
-            MENU
-          </button>
-          <button
-            className="lg:hidden text-xs tracking-[0.2em] uppercase font-medium"
-            onClick={() => setIsMenuOpen(true)}
-          >
+            className="text-xs tracking-[0.2em] uppercase font-medium hover:opacity-70 cursor-pointer">
             MENU
           </button>
         </div>
@@ -212,9 +218,9 @@ function Navbar({
           }`}
         >
           {/* Close button */}
-          <div className="absolute top-0 right-0 px-6 sm:px-8 pt-8 sm:pt-12">
+          <div className="absolute top-0 right-0 px-4 sm:px-8 pt-6 sm:pt-12">
             <button
-              className="w-10 h-10 rounded-full border border-white/30 flex items-center justify-center hover:border-white transition-colors"
+              className="w-10 h-10 rounded-full border border-white/30 flex items-center justify-center hover:border-white transition-colors active:scale-95"
               onClick={() => setIsMenuOpen(false)}
               aria-label="Close menu"
             >
@@ -223,7 +229,7 @@ function Navbar({
           </div>
 
           {/* Links */}
-          <div className="flex-1 flex flex-col justify-center items-center">
+          <div className="flex-1 flex flex-col justify-center items-center px-4">
             {['DETECTION', 'ATTRIBUTION', 'ANALYTICS', 'PLATFORM', 'ABOUT'].map((label, i) => (
               <button
                 key={label}
@@ -231,7 +237,7 @@ function Navbar({
                   onScrollTo(i * 0.2);
                   setIsMenuOpen(false);
                 }}
-                className={`px-8 sm:px-12 py-3 text-2xl tracking-wide uppercase transition-all duration-500 ${
+                className={`w-full text-center px-8 py-4 text-xl sm:text-2xl tracking-wide uppercase transition-all duration-500 active:scale-95 ${
                   i === 0 ? 'text-signal' : 'text-white/60 hover:text-white'
                 }`}
                 style={{
@@ -246,11 +252,19 @@ function Navbar({
           </div>
 
           {/* Footer */}
-          <div className="px-8 sm:px-12 pb-10 flex gap-8">
-            <button onClick={onLaunchApp} className="text-xs tracking-[0.2em] uppercase text-white/60 hover:text-white transition-colors">
+          <div className="px-6 sm:px-12 pb-8 sm:pb-10 flex flex-col sm:flex-row gap-4 sm:gap-8">
+            <button
+              onClick={() => { onLaunchApp(); setIsMenuOpen(false); }}
+              className="flex items-center justify-center gap-2 text-xs tracking-[0.2em] uppercase text-white/60 hover:text-white transition-colors py-3"
+            >
+              <AlertTriangle size={14} />
               ALERTS
             </button>
-            <button onClick={() => { onScrollTo(0); setIsMenuOpen(false); }} className="text-xs tracking-[0.2em] uppercase text-white/60 hover:text-white transition-colors">
+            <button
+              onClick={() => { onScrollTo(0); setIsMenuOpen(false); }}
+              className="flex items-center justify-center gap-2 text-xs tracking-[0.2em] uppercase text-white/60 hover:text-white transition-colors py-3"
+            >
+              <ChevronUp size={14} />
               TOP
             </button>
           </div>
@@ -263,15 +277,16 @@ function Navbar({
 // Section 1 - Hero
 function Section1({ opacity, onLaunch }: { opacity: number; onLaunch: () => void }) {
   const staggerVisible = opacity > 0.3;
+  const isMobile = useIsMobile();
 
   return (
     <div
-      className="absolute inset-0 flex items-center px-6 sm:px-8 md:px-20 lg:px-32 pointer-events-none"
+      className="absolute inset-0 flex items-end sm:items-center px-4 sm:px-6 md:px-12 lg:px-20 xl:px-32 pb-24 sm:pb-0 pointer-events-none"
       style={{ opacity, transition: 'opacity 0.1s linear' }}
     >
       <div className="max-w-3xl">
         <h1
-          className="text-[clamp(2rem,5vw,5rem)] font-light uppercase leading-[1.2]"
+          className="text-[clamp(1.75rem,8vw,5rem)] font-light uppercase leading-[1.1] sm:leading-[1.2]"
           style={{
             color: DARK,
             opacity: staggerVisible ? 1 : 0,
@@ -283,7 +298,7 @@ function Section1({ opacity, onLaunch }: { opacity: number; onLaunch: () => void
           Detecting spills from orbit in real time
         </h1>
         <p
-          className="mt-6 text-sm tracking-[0.3em] uppercase"
+          className="mt-4 sm:mt-6 text-xs sm:text-sm tracking-[0.2em] sm:tracking-[0.3em] uppercase"
           style={{
             color: `${DARK}90`,
             opacity: staggerVisible ? 1 : 0,
@@ -299,7 +314,7 @@ function Section1({ opacity, onLaunch }: { opacity: number; onLaunch: () => void
       {/* Bottom-right button - launches app */}
       <button
         onClick={onLaunch}
-        className="absolute bottom-12 right-6 sm:right-8 md:right-12 w-12 h-12 rounded-full flex items-center justify-center pointer-events-auto hover:opacity-70 hover:scale-110 transition-all"
+        className="absolute bottom-6 sm:bottom-12 right-4 sm:right-6 md:right-12 w-11 h-11 sm:w-12 sm:h-12 rounded-full flex items-center justify-center pointer-events-auto hover:opacity-70 active:scale-95 transition-all"
         style={{
           border: `1px solid ${DARK}50`,
           opacity: staggerVisible ? 1 : 0,
@@ -309,8 +324,23 @@ function Section1({ opacity, onLaunch }: { opacity: number; onLaunch: () => void
         }}
         aria-label="Launch platform"
       >
-        <ArrowRight size={18} style={{ color: DARK }} />
+        <ArrowRight size={16} className="sm:w-[18px] sm:h-[18px]" style={{ color: DARK }} />
       </button>
+
+      {/* Mobile scroll hint */}
+      {isMobile && (
+        <div
+          className="absolute bottom-6 left-1/2 -translate-x-1/2 flex flex-col items-center gap-1 pointer-events-none"
+          style={{
+            opacity: staggerVisible ? 0.6 : 0,
+            transition: 'opacity 0.8s ease',
+            transitionDelay: '500ms',
+          }}
+        >
+          <span className="text-[10px] tracking-[0.2em] uppercase" style={{ color: DARK }}>Scroll</span>
+          <ChevronDown size={16} style={{ color: DARK }} className="animate-bounce" />
+        </div>
+      )}
     </div>
   );
 }
@@ -326,15 +356,16 @@ function Section2({
   onScrollUp: () => void;
 }) {
   const staggerVisible = opacity > 0.3;
+  const isMobile = useIsMobile();
 
   return (
     <div
-      className="absolute inset-0 flex items-center justify-center px-6 sm:px-8 pointer-events-none"
+      className="absolute inset-0 flex items-center justify-center px-4 sm:px-6 md:px-8 pointer-events-none"
       style={{ opacity, transition: 'opacity 0.1s linear' }}
     >
-      <div className="max-w-[900px] text-center">
+      <div className="max-w-[900px] text-center px-2">
         <h2
-          className="text-[clamp(1.5rem,4.5vw,4.5rem)] font-extralight tracking-wide leading-[1.3] uppercase"
+          className="text-[clamp(1.25rem,6vw,4.5rem)] font-extralight tracking-wide leading-[1.25] sm:leading-[1.3] uppercase"
           style={{
             color: DARK,
             opacity: staggerVisible ? 1 : 0,
@@ -343,17 +374,26 @@ function Section2({
             transitionDelay: '0ms',
           }}
         >
-          We trace pollution to its source{' '}
-          <span style={{ color: `${DARK}80` }}>with precision</span>{' '}
-          <span style={{ color: `${DARK}50` }}>across every maritime frontier</span>
+          {isMobile ? (
+            <>
+              We trace pollution{' '}
+              <span style={{ color: `${DARK}80` }}>to its source</span>
+            </>
+          ) : (
+            <>
+              We trace pollution to its source{' '}
+              <span style={{ color: `${DARK}80` }}>with precision</span>{' '}
+              <span style={{ color: `${DARK}50` }}>across every maritime frontier</span>
+            </>
+          )}
         </h2>
       </div>
 
-      {/* Right column controls */}
-      <div className="absolute bottom-16 right-6 sm:right-8 md:right-12 flex flex-col items-center">
+      {/* Controls - positioned based on screen size */}
+      <div className={`absolute ${isMobile ? 'bottom-8 right-4' : 'bottom-16 right-6 sm:right-8 md:right-12'} flex flex-col items-center`}>
         <button
           onClick={onScrollDown}
-          className="w-12 h-12 rounded-full flex items-center justify-center pointer-events-auto hover:opacity-70 hover:scale-110 transition-all"
+          className="w-10 h-10 sm:w-12 sm:h-12 rounded-full flex items-center justify-center pointer-events-auto hover:opacity-70 active:scale-95 transition-all"
           style={{
             border: `1px solid ${DARK}40`,
             opacity: staggerVisible ? 1 : 0,
@@ -363,27 +403,29 @@ function Section2({
           }}
           aria-label="Scroll down"
         >
-          <ArrowDown size={18} style={{ color: DARK }} />
+          <ArrowDown size={16} className="sm:w-[18px] sm:h-[18px]" style={{ color: DARK }} />
         </button>
 
-        {/* Dots */}
-        <div
-          className="mt-4 flex flex-col gap-2 items-center"
-          style={{
-            opacity: staggerVisible ? 1 : 0,
-            transform: staggerVisible ? 'translateY(0)' : 'translateY(24px)',
-            transition: 'opacity 0.8s cubic-bezier(0.16, 1, 0.3, 1), transform 0.8s cubic-bezier(0.16, 1, 0.3, 1)',
-            transitionDelay: '350ms',
-          }}
-        >
-          <span className="w-2 h-2 rounded-full" style={{ backgroundColor: DARK }} />
-          <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: `${DARK}60` }} />
-          <span className="w-1 h-1 rounded-full" style={{ backgroundColor: `${DARK}40` }} />
-        </div>
+        {/* Dots - hidden on mobile */}
+        {!isMobile && (
+          <div
+            className="mt-4 flex flex-col gap-2 items-center"
+            style={{
+              opacity: staggerVisible ? 1 : 0,
+              transform: staggerVisible ? 'translateY(0)' : 'translateY(24px)',
+              transition: 'opacity 0.8s cubic-bezier(0.16, 1, 0.3, 1), transform 0.8s cubic-bezier(0.16, 1, 0.3, 1)',
+              transitionDelay: '350ms',
+            }}
+          >
+            <span className="w-2 h-2 rounded-full" style={{ backgroundColor: DARK }} />
+            <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: `${DARK}60` }} />
+            <span className="w-1 h-1 rounded-full" style={{ backgroundColor: `${DARK}40` }} />
+          </div>
+        )}
 
         <button
           onClick={onScrollUp}
-          className="w-10 h-10 rounded-full flex items-center justify-center mt-4 pointer-events-auto hover:opacity-70 hover:scale-110 transition-all"
+          className="w-9 h-9 sm:w-10 sm:h-10 rounded-full flex items-center justify-center mt-3 sm:mt-4 pointer-events-auto hover:opacity-70 active:scale-95 transition-all"
           style={{
             border: `1px solid ${DARK}30`,
             opacity: staggerVisible ? 1 : 0,
@@ -393,7 +435,7 @@ function Section2({
           }}
           aria-label="Scroll up"
         >
-          <ChevronUp size={16} style={{ color: `${DARK}80` }} />
+          <ChevronUp size={14} className="sm:w-4 sm:h-4" style={{ color: `${DARK}80` }} />
         </button>
       </div>
     </div>
@@ -403,15 +445,16 @@ function Section2({
 // Section 3 - Right aligned, white text
 function Section3({ opacity, onLaunch }: { opacity: number; onLaunch: () => void }) {
   const staggerVisible = opacity > 0.3;
+  const isMobile = useIsMobile();
 
   return (
     <div
-      className="absolute inset-0 flex items-center justify-end px-6 sm:px-8 md:px-20 lg:px-32 pointer-events-none"
+      className="absolute inset-0 flex items-center justify-start sm:justify-end px-4 sm:px-6 md:px-12 lg:px-20 xl:px-32 pointer-events-none"
       style={{ opacity, transition: 'opacity 0.1s linear' }}
     >
       <div className="max-w-2xl text-left">
         <p
-          className="text-lg tracking-wide mb-4"
+          className="text-sm sm:text-lg tracking-wide mb-2 sm:mb-4"
           style={{
             color: 'rgba(255,255,255,0.6)',
             opacity: staggerVisible ? 1 : 0,
@@ -423,7 +466,7 @@ function Section3({ opacity, onLaunch }: { opacity: number; onLaunch: () => void
           NTRO | SIH 2026
         </p>
         <h2
-          className="text-[clamp(2rem,4vw,4rem)] font-light leading-[1.2] uppercase tracking-wide mb-8"
+          className="text-[clamp(1.75rem,7vw,4rem)] font-light leading-[1.15] sm:leading-[1.2] uppercase tracking-wide mb-6 sm:mb-8"
           style={{
             color: '#ffffff',
             opacity: staggerVisible ? 1 : 0,
@@ -432,31 +475,35 @@ function Section3({ opacity, onLaunch }: { opacity: number; onLaunch: () => void
             transitionDelay: '150ms',
           }}
         >
-          Identifying vessels,<br />protecting tomorrow.
+          {isMobile ? (
+            <>Identifying<br />vessels, protecting<br />tomorrow.</>
+          ) : (
+            <>Identifying vessels,<br />protecting tomorrow.</>
+          )}
         </h2>
         <div
-          className="flex items-center gap-4"
+          className="flex items-center gap-3 sm:gap-4"
           style={{
             opacity: staggerVisible ? 1 : 0,
             transform: staggerVisible ? 'translateY(0)' : 'translateY(24px)',
-            transition: 'opacity 0.8s cubic-bezier(0.16, 1, 0.3, 1), transform 0.8s cubic-bezier(0.16, 1, 0.3, 1)',
+            transition: 'opacity 0.8s cubic-bezier(0.8s cubic-bezier(0.16, 1, 0.3, 1), transform 0.8s cubic-bezier(0.16, 1, 0.3, 1)',
             transitionDelay: '300ms',
           }}
         >
           <button
             onClick={onLaunch}
-            className="text-sm tracking-[0.3em] uppercase pointer-events-auto hover:opacity-80 transition-opacity"
+            className="text-xs sm:text-sm tracking-[0.2em] sm:tracking-[0.3em] uppercase pointer-events-auto hover:opacity-80 active:scale-95 transition-all"
             style={{ color: 'rgba(255,255,255,0.8)' }}
           >
             Launch Platform
           </button>
           <button
             onClick={onLaunch}
-            className="w-10 h-10 rounded-full flex items-center justify-center pointer-events-auto hover:scale-110 transition-transform"
+            className="w-9 h-9 sm:w-10 sm:h-10 rounded-full flex items-center justify-center pointer-events-auto active:scale-95 transition-transform"
             style={{ backgroundColor: SIGNAL }}
             aria-label="Launch platform"
           >
-            <Crosshair size={16} style={{ color: '#05080F' }} />
+            <Crosshair size={14} className="sm:w-4 sm:h-4" style={{ color: '#05080F' }} />
           </button>
         </div>
       </div>
@@ -470,7 +517,7 @@ function Section3({ opacity, onLaunch }: { opacity: number; onLaunch: () => void
 
 export default function Landing2Page() {
   const navigate = useNavigate();
-  const { videoRef, containerRef, scrollProgress, setVideoDuration, scrollTo } = useVideoScrub();
+  const { videoRef, containerRef, scrollProgress, setVideoDuration, scrollTo, lenisRef } = useVideoScrub();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
 
   // Calculate section opacities based on scroll progress
@@ -484,7 +531,6 @@ export default function Landing2Page() {
   const scrollUp = useCallback(() => scrollTo(Math.max(0, scrollProgress - 0.25)), [scrollProgress, scrollTo]);
 
   // Prevent body scroll when menu is open
-  const { lenisRef } = useVideoScrub();
   useEffect(() => {
     if (!lenisRef.current) return;
     if (isMenuOpen) {
