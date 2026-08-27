@@ -1,109 +1,66 @@
 /**
  * DetectionPipeline.tsx
- * SAR processing, drift modeling, and vessel attribution scoring.
- * The forensic brain: evidence chains, confidence curves, and analytical steps.
+ * Chunk 11: Workflow & Pipeline States
+ * New analysis flow, staged pipeline runner, loading/error states, cancel/retry.
  */
 
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Scan, Activity, Target, ChevronRight, CheckCircle, Clock, AlertTriangle } from 'lucide-react';
+import { Scan, Activity, Target, ChevronRight, CheckCircle, Clock, AlertTriangle, X, RefreshCw, Play, Pause, MapPin, Database, Wind, Ship, Filter } from 'lucide-react';
 
-type PipelineStatus = 'pending' | 'processing' | 'completed' | 'failed';
+type PipelineStatus = 'pending' | 'processing' | 'completed' | 'failed' | 'cancelled' | 'empty';
 
-interface CompletedStep {
+interface PipelineStep {
+  id: string;
   name: string;
-  status: 'completed';
-  timestamp: string;
-  duration_ms: number;
-  result: Record<string, any> & { confidence: number };
-  evidence: string[];
-}
-
-interface ProcessingStep {
-  name: string;
-  status: 'processing';
-  startedAt: string;
+  description: string;
+  status: PipelineStatus;
   progress: number;
-  confidence: null;
-  evidence: [];
+  durationMs?: number;
+  startedAt?: string;
+  completedAt?: string;
+  result?: Record<string, any>;
+  evidence?: string[];
+  error?: string;
 }
 
-interface PendingStep {
-  name: string;
-  status: 'pending';
-  confidence: null;
-  evidence: [];
+interface NewAnalysisConfig {
+  aoi: string;
+  dateRange: { start: string; end: string };
+  satellitePass: string;
+  modelParams: {
+    sensitivity: number;
+    falsePositiveThreshold: number;
+    hindcastHours: number;
+    forecastHours: number;
+  };
 }
 
-interface FailedStep {
-  name: string;
-  status: 'failed';
-  confidence: null;
-  evidence: [];
-}
+const PIPELINE_STAGES: Omit<PipelineStep, 'status' | 'progress'>[] = [
+  { id: 'ingest', name: 'Ingest', description: 'Load satellite imagery and AIS data', evidence: [] },
+  { id: 'detect', name: 'Detect', description: 'Run spill detection models', evidence: [] },
+  { id: 'characterize', name: 'Characterize', description: 'Estimate age, type, and volume', evidence: [] },
+  { id: 'hindcast', name: 'Hindcast', description: 'Trace drift back to origin', evidence: [] },
+  { id: 'reconstruct', name: 'Reconstruct AIS', description: 'Rebuild vessel tracks around origin', evidence: [] },
+  { id: 'score', name: 'Score', description: 'Rank suspect vessels', evidence: [] },
+];
 
-type PipelineStep = CompletedStep | ProcessingStep | PendingStep | FailedStep;
-
-// Mock detection pipeline data
-const mockPipeline = {
-  caseId: 'SPILL-2026-0815-003',
-  timestamp: '2026-08-27T01:42:23Z',
-  satellite: 'Sentinel-1A ASC 12345',
-  location: { lat: 18.94, lon: 72.83 },
-  steps: {
-    sar_processing: {
-      name: 'SAR Processing',
-      status: 'completed' as PipelineStatus,
-      timestamp: '2026-08-27T01:43:01Z',
-      duration_ms: 38000,
-      result: {
-        anomaly_score: 0.94,
-        confidence: 0.89,
-        area_km2: 19.64,
-        texture_class: 'oil_slick_likely',
-        speckle_variance: 0.12,
-      },
-      evidence: [
-        'Radial texture contrast detected (σ²=0.12)',
-        'Backscatter attenuation consistent with oil film',
-        'Boundary coherence 0.87 > threshold 0.70',
-      ],
-    },
-    characterization: {
-      name: 'Characterization',
-      status: 'completed' as PipelineStatus,
-      timestamp: '2026-08-27T01:44:15Z',
-      duration_ms: 74000,
-      result: {
-        spill_type: 'moderate_emulsion',
-        thickness_class: 'medium',
-        estimated_volume_m3: 1542,
-        windage_factor: 0.012,
-        age_hours: 12.3,
-        confidence: 0.78,
-      },
-      evidence: [
-        'Texture analysis: moderate emulsion (class 3)',
-        'Wind speed 8.2 m/s, direction 215° (consistent with breakup)',
-        'Volume estimate from radar cross-section calibrated',
-      ],
-    },
-    drift_hindcast: {
-      name: 'Drift Hindcast',
-      status: 'processing' as PipelineStatus,
-      startedAt: '2026-08-27T01:44:20Z',
-      progress: 0.73,
-      confidence: null,
-      evidence: [],
-    },
-    attribution: {
-      name: 'Vessel Attribution',
-      status: 'pending' as PipelineStatus,
-      confidence: null,
-      evidence: [],
-    },
-  } as Record<string, PipelineStep>,
-};
+// New Analysis Form Field
+const FormField = ({
+  label,
+  children,
+  hint,
+}: {
+  label: string;
+  children: React.ReactNode;
+  hint?: string;
+}) => (
+  <div className="space-y-1.5">
+    <label className="font-mono text-[10px] text-mute-dim uppercase tracking-wider">{label}</label>
+    {children}
+    {hint && <p className="font-mono text-[9px] text-mute-dim">{hint}</p>}
+  </div>
+);
 
 const ConfidenceBar = ({ value, label }: { value: number; label: string }) => (
   <div className="space-y-1">
@@ -117,7 +74,7 @@ const ConfidenceBar = ({ value, label }: { value: number; label: string }) => (
       <motion.div
         initial={{ width: 0 }}
         animate={{ width: `${value * 100}%` }}
-        transition={{ duration: 1, ease: [0.22, 1, 0.36, 1] }}
+        transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
         className={`h-full ${value >= 0.8 ? 'bg-signal' : value >= 0.6 ? 'bg-amber' : 'bg-sheen'}`}
       />
     </div>
@@ -129,86 +86,77 @@ const StepCard = ({
   index,
   expanded,
   onToggleExpand,
+  onRetry,
 }: {
   step: PipelineStep;
   index: number;
   expanded: boolean;
   onToggleExpand: () => void;
+  onRetry?: () => void;
 }) => {
-  const isCompleted = step.status === 'completed';
-  const isProcessing = step.status === 'processing';
-  const isPending = step.status === 'pending';
-  const isFailed = step.status === 'failed';
-
-  const hasResult = 'result' in step;
-  const hasTimestamp = 'timestamp' in step;
-  const hasStartedAt = 'startedAt' in step;
-  const hasProgress = 'progress' in step;
-
-  const completedStep = step as CompletedStep;
-  const processingStep = step as ProcessingStep;
-
-  const StatusIcon = () => {
-    if (isCompleted) return <CheckCircle className="w-4 h-4 text-signal" />;
-    if (isProcessing) return <Activity className="w-4 h-4 text-sheen" />;
-    if (isFailed) return <AlertTriangle className="w-4 h-4 text-amber" />;
-    return <Clock className="w-4 h-4 text-steel" />;
+  const statusColors = {
+    pending: 'text-steel',
+    processing: 'text-sheen',
+    completed: 'text-signal',
+    failed: 'text-amber',
+    cancelled: 'text-mute',
+    empty: 'text-mute',
   };
 
-  const ProgressIndicator = () => {
-    if (isProcessing && hasProgress) {
-      return (
-        <div className="flex items-center gap-2">
-          <div className="w-24 h-1.5 bg-steel/30 rounded-full overflow-hidden">
-            <motion.div
-              className="h-full bg-sheen"
-              initial={{ width: 0 }}
-              animate={{ width: `${processingStep.progress * 100}%` }}
-              transition={{ duration: 2, ease: 'linear', repeat: Infinity }}
-            />
-          </div>
-          <span className="font-mono text-xs text-sheen">
-            {Math.round(processingStep.progress * 100)}%
-          </span>
-        </div>
-      );
+  const statusBg = {
+    pending: 'bg-steel/10 border-steel/30',
+    processing: 'bg-sheen/10 border-sheen/30',
+    completed: 'bg-signal/10 border-signal/30',
+    failed: 'bg-amber/10 border-amber/30',
+    cancelled: 'bg-mute/10 border-mute/30',
+    empty: 'bg-steel/10 border-steel/30',
+  };
+
+  const StatusIcon = () => {
+    switch (step.status) {
+      case 'completed': return <CheckCircle className="w-4 h-4 text-signal" />;
+      case 'processing': return <Activity className="w-4 h-4 text-sheen animate-pulse" />;
+      case 'failed': return <AlertTriangle className="w-4 h-4 text-amber" />;
+      case 'cancelled': return <X className="w-4 h-4 text-mute" />;
+      default: return <Clock className="w-4 h-4 text-steel" />;
     }
-    return null;
   };
 
   return (
-    <div className="bg-deep border border-steel/50 rounded-lg overflow-hidden">
+    <div className={`border rounded-lg overflow-hidden transition-colors ${statusBg[step.status]}`}>
       {/* Header */}
       <button
         onClick={onToggleExpand}
-        className="w-full flex items-center justify-between px-4 py-3 hover:bg-steel/10 transition-colors"
+        className="w-full flex items-center justify-between px-3 py-2.5 hover:bg-white/5 transition-colors"
       >
-        <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-lg bg-steel/20 border border-steel/30 flex items-center justify-center">
+        <div className="flex items-center gap-2">
+          <div className={`w-7 h-7 rounded border flex items-center justify-center ${
+            step.status === 'completed' ? 'bg-signal/20 border-signal/50' : 'bg-abyss border-steel/50'
+          }`}>
             <StatusIcon />
           </div>
           <div className="text-left">
-            <div className="flex items-center gap-2">
-              <span className="font-mono text-xs text-mute-dim tracking-widest">{index.toString().padStart(2, '0')}</span>
-              <span className="font-display text-sm font-semibold text-ice">
-                {step.name}
-              </span>
+            <div className="flex items-center gap-1.5">
+              <span className="font-mono text-[10px] text-mute-dim">{index + 1}</span>
+              <span className="font-mono text-xs text-ice">{step.name}</span>
             </div>
-            {hasTimestamp && (
-              <div className="font-mono text-[10px] text-mute">
-                {new Date(completedStep.timestamp).toISOString().replace('T', ' ').slice(0, 19)}
-              </div>
-            )}
-            {hasStartedAt && (
-              <div className="font-mono text-[10px] text-mute">
-                Started at {new Date(processingStep.startedAt).toISOString().replace('T', ' ').slice(0, 19)}
-              </div>
-            )}
+            <div className="font-mono text-[9px] text-mute">{step.description}</div>
           </div>
         </div>
 
-        <div className="flex items-center gap-3">
-          <ProgressIndicator />
+        <div className="flex items-center gap-2">
+          {step.status === 'processing' && (
+            <span className="font-mono text-xs text-sheen">{step.progress}%</span>
+          )}
+          {step.status === 'failed' && onRetry && (
+            <button
+              onClick={(e) => { e.stopPropagation(); onRetry(); }}
+              className="flex items-center gap-1 px-2 py-1 bg-amber/20 border border-amber/50 rounded text-amber text-[10px] font-mono hover:bg-amber/30 transition-colors"
+            >
+              <RefreshCw size={10} />
+              Retry
+            </button>
+          )}
           <motion.div
             initial={{ rotate: 0 }}
             animate={{ rotate: expanded ? 90 : 0 }}
@@ -219,101 +167,78 @@ const StepCard = ({
         </div>
       </button>
 
+      {/* Progress Bar for Processing */}
+      {step.status === 'processing' && (
+        <div className="px-3 pb-2">
+          <div className="h-1 bg-steel/20 rounded-full overflow-hidden">
+            <motion.div
+              className="h-full bg-sheen"
+              initial={{ width: 0 }}
+              animate={{ width: `${step.progress}%` }}
+              transition={{ duration: 0.3 }}
+            />
+          </div>
+        </div>
+      )}
+
       {/* Expanded Content */}
       <AnimatePresence>
-        {expanded && (
+        {expanded && step.status !== 'pending' && step.status !== 'empty' && (
           <motion.div
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: 'auto', opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
+            initial={{ height: 0 }}
+            animate={{ height: 'auto' }}
+            exit={{ height: 0 }}
             className="overflow-hidden"
           >
-            <div className="px-4 pb-4 border-t border-steel/30">
-              {isCompleted && hasResult && (
-                <div className="space-y-4">
+            <div className="px-3 pb-3 border-t border-black/20">
+              {step.status === 'completed' && step.result && (
+                <div className="pt-2 space-y-2">
                   {/* Results */}
-                  <div className="grid grid-cols-2 gap-3">
-                    {Object.entries(completedStep.result)
-                      .filter(([key]) => key !== 'confidence')
-                      .map(([key, value]) => (
-                        <div key={key} className="bg-abyss/50 border border-steel/30 rounded p-3">
-                          <div className="font-mono text-[10px] text-mute-dim mb-1">
-                            {key.replace(/_/g, ' ').toUpperCase()}
-                          </div>
-                          <div className="font-mono text-sm text-ice">
-                            {typeof value === 'number'
-                              ? value.toFixed(2)
-                              : String(value)}
-                          </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    {Object.entries(step.result).map(([key, value]) => (
+                      <div key={key} className="bg-abyss/50 border border-steel/30 rounded p-2">
+                        <div className="font-mono text-[9px] text-mute-dim uppercase">{key.replace(/_/g, ' ')}</div>
+                        <div className="font-mono text-xs text-ice">
+                          {typeof value === 'number' ? value.toFixed(3) : String(value)}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  {/* Evidence */}
+                  {step.evidence && step.evidence.length > 0 && (
+                    <div className="pt-1">
+                      <div className="font-mono text-[9px] text-mute-dim uppercase mb-1">Evidence</div>
+                      {step.evidence.map((e, i) => (
+                        <div key={i} className="flex items-start gap-1.5 text-xs text-ice">
+                          <span className="text-sheen text-[10px]">{i + 1}.</span>
+                          <span className="text-mute">{e}</span>
                         </div>
                       ))}
-                  </div>
-
-                  {/* Evidence Chain */}
-                  {completedStep.evidence && completedStep.evidence.length > 0 && (
-                    <div>
-                      <div className="font-mono text-[10px] text-mute-dim tracking-widest uppercase mb-2 flex items-center gap-2">
-                        <Target className="w-3 h-3" />
-                        Evidence Chain
-                      </div>
-                      <div className="space-y-1.5">
-                        {completedStep.evidence.map((evidence, i) => (
-                          <div
-                            key={i}
-                            className="flex items-start gap-2 text-xs text-ice leading-relaxed"
-                          >
-                            <span className="font-mono text-sheen text-[10px] leading-5">
-                              {(i + 1).toString().padStart(2, '0')}
-                            </span>
-                            {evidence}
-                          </div>
-                        ))}
-                      </div>
+                    </div>
+                  )}
+                  {step.result?.confidence && (
+                    <div className="pt-2">
+                      <ConfidenceBar value={step.result.confidence} label="Confidence" />
                     </div>
                   )}
                 </div>
               )}
 
-              {isProcessing && (
-                <div className="py-8 text-center">
-                  <Activity className="w-8 h-8 text-sheen mx-auto mb-3 animate-spin" />
-                  <div className="font-mono text-xs text-ice mb-1">
-                    Processing...
-                  </div>
-                  <div className="font-mono text-[10px] text-mute">
-                    Running drift hindcast models
-                  </div>
-                </div>
-              )}
-
-              {isPending && (
-                <div className="py-8 text-center">
-                  <Clock className="w-6 h-6 text-steel mx-auto mb-2" />
-                  <div className="font-mono text-xs text-mute">
-                    Awaiting previous step completion
+              {step.status === 'failed' && (
+                <div className="pt-2">
+                  <div className="flex items-start gap-2">
+                    <AlertTriangle size={14} className="text-amber shrink-0 mt-0.5" />
+                    <div>
+                      <p className="font-mono text-xs text-amber">{step.error || 'Processing failed'}</p>
+                      <p className="font-mono text-[10px] text-mute mt-1">Check satellite coverage and retry.</p>
+                    </div>
                   </div>
                 </div>
               )}
 
-              {isFailed && (
-                <div className="py-4 text-center">
-                  <AlertTriangle className="w-6 h-6 text-amber mx-auto mb-2" />
-                  <div className="font-mono text-xs text-amber mb-1">
-                    Processing Failed
-                  </div>
-                  <div className="font-mono text-[10px] text-mute">
-                    Check satellite data availability
-                  </div>
-                </div>
-              )}
-
-              {/* Confidence Bar (if available) */}
-              {hasResult && completedStep.result.confidence && (
-                <div className="mt-4 pt-4 border-t border-steel/30">
-                  <ConfidenceBar
-                    value={completedStep.result.confidence}
-                    label="Confidence"
-                  />
+              {step.status === 'cancelled' && (
+                <div className="pt-2">
+                  <p className="font-mono text-xs text-mute">Cancelled by user</p>
                 </div>
               )}
             </div>
@@ -325,61 +250,321 @@ const StepCard = ({
 };
 
 export const DetectionPipeline = () => {
+  const [view, setView] = useState<'new' | 'pipeline' | 'empty'>('empty');
+  const [pipelineState, setPipelineState] = useState<'idle' | 'running' | 'paused' | 'complete' | 'error'>('idle');
+  const [steps, setSteps] = useState<PipelineStep[]>([]);
+  const [currentStepIndex, setCurrentStepIndex] = useState(0);
   const [expandedStep, setExpandedStep] = useState<number | null>(0);
 
-  return (
-    <div className="p-4 space-y-6">
-      {/* Pipeline Header */}
-      <div className="flex items-start justify-between mb-4">
-        <div>
-          <div className="font-mono text-[10px] text-mute-dim tracking-widest mb-1">
-            CASE {mockPipeline.caseId}
-          </div>
-          <h2 className="font-display text-lg font-semibold text-ice">
-            Detection Pipeline
-          </h2>
-        </div>
-        <div className="font-mono text-[10px] text-mute">
-          {mockPipeline.satellite}
-        </div>
-      </div>
+  // New analysis form state
+  const [config, setConfig] = useState<NewAnalysisConfig>({
+    aoi: 'Mumbai Offshore Block A',
+    dateRange: { start: '2026-08-14', end: '2026-08-15' },
+    satellitePass: 'S1A-2026-08-15-06:42-ASC',
+    modelParams: {
+      sensitivity: 0.85,
+      falsePositiveThreshold: 0.3,
+      hindcastHours: 4,
+      forecastHours: 12,
+    },
+  });
 
-      {/* Overall Progress */}
-      <div className="bg-deep/50 border border-steel/30 rounded p-4">
-        <div className="flex items-center gap-3 mb-2">
-          <Scan className="w-4 h-4 text-sheen" />
-          <span className="font-mono text-xs text-mute-dim tracking-widest uppercase">
-            Pipeline Progress
-          </span>
-        </div>
-        <div className="h-2 bg-steel/30 rounded-full overflow-hidden">
-          <motion.div
-            initial={{ width: 0 }}
-            animate={{ width: '58%' }}
-            transition={{ duration: 1.5, ease: [0.22, 1, 0.36, 1] }}
-            className="h-full bg-sheen"
-          />
-        </div>
-        <div className="flex items-center justify-between mt-2 font-mono text-[10px] text-mute">
-          <span>2 of 4 steps completed</span>
-          <span>Est. remaining: 45s</span>
-        </div>
-      </div>
+  // Initialize pipeline
+  const startPipeline = useCallback(() => {
+    const initialSteps: PipelineStep[] = PIPELINE_STAGES.map((s, i) => ({
+      ...s,
+      status: i === 0 ? 'processing' : 'pending',
+      progress: i === 0 ? 0 : 0,
+    }));
+    setSteps(initialSteps);
+    setCurrentStepIndex(0);
+    setPipelineState('running');
+    setView('pipeline');
 
-      {/* Pipeline Steps */}
-      <div className="space-y-2">
-        {Object.entries(mockPipeline.steps).map(([key, step], index) => (
-          <StepCard
-            key={key}
-            step={step}
-            index={index}
-            expanded={expandedStep === index}
-            onToggleExpand={() =>
-              setExpandedStep(expandedStep === index ? null : index)
+    // Simulate pipeline progress
+    let stepIdx = 0;
+    const interval = setInterval(() => {
+      setSteps((prev) => {
+        const next = [...prev];
+        if (stepIdx < next.length) {
+          if (next[stepIdx].status === 'processing') {
+            next[stepIdx].progress += Math.random() * 15;
+            if (next[stepIdx].progress >= 100) {
+              next[stepIdx].progress = 100;
+              next[stepIdx].status = 'completed';
+              next[stepIdx].result = {
+                confidence: 0.75 + Math.random() * 0.2,
+                runtime_ms: Math.floor(5000 + Math.random() * 5000),
+              };
+              next[stepIdx].evidence = ['Sample evidence line 1', 'Sample evidence line 2'];
+              if (stepIdx + 1 < next.length) {
+                next[stepIdx + 1].status = 'processing';
+                next[stepIdx + 1].progress = 5;
+              }
+              stepIdx++;
             }
-          />
-        ))}
-      </div>
+          }
+        } else {
+          clearInterval(interval);
+          setPipelineState('complete');
+        }
+        return next;
+      });
+      setCurrentStepIndex(stepIdx);
+    }, 800);
+
+    return () => clearInterval(interval);
+  }, []);
+
+  const cancelPipeline = () => {
+    setSteps((prev) => prev.map((s) => s.status === 'processing' ? { ...s, status: 'cancelled' } : s));
+    setPipelineState('idle');
+  };
+
+  const resetPipeline = () => {
+    setSteps([]);
+    setPipelineState('idle');
+    setView('empty');
+  };
+
+  const retryStep = (index: number) => {
+    setSteps((prev) =>
+      prev.map((s, i) =>
+        i === index ? { ...s, status: 'processing', progress: 0, error: undefined } : s
+      )
+    );
+  };
+
+  return (
+    <div className="flex flex-col h-full">
+      {/* New Analysis View */}
+      {view === 'empty' && (
+        <div className="flex-1 flex flex-col items-center justify-center p-6 text-center">
+          <div className="w-16 h-16 rounded-full bg-steel/20 border border-steel/50 flex items-center justify-center mb-4">
+            <Play className="w-6 h-6 text-signal" />
+          </div>
+          <h2 className="font-mono text-lg text-ice mb-1">No Active Analysis</h2>
+          <p className="font-mono text-xs text-mute mb-6">Create a new analysis pipeline to start detection.</p>
+          <button
+            onClick={() => setView('new')}
+            className="px-4 py-2 bg-signal/10 border border-signal/30 rounded font-mono text-sm text-signal hover:bg-signal/20 transition-colors"
+          >
+            New Analysis
+          </button>
+        </div>
+      )}
+
+      {/* New Analysis Form */}
+      {view === 'new' && (
+        <div className="flex-1 overflow-y-auto p-4">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="font-mono text-sm text-ice uppercase">New Analysis</h2>
+            <button onClick={() => setView('empty')} className="p-1 hover:bg-steel/20 rounded">
+              <X className="w-4 h-4 text-mute" />
+            </button>
+          </div>
+
+          <div className="space-y-4">
+            {/* AOI */}
+            <FormField label="Area of Interest" hint="Define the region for analysis">
+              <div className="flex items-center gap-2">
+                <div className="flex-1 px-3 py-2 bg-abyss border border-steel/50 rounded font-mono text-xs text-ice">
+                  {config.aoi}
+                </div>
+                <button className="px-3 py-2 bg-steel/20 border border-steel/50 rounded text-ice hover:border-signal transition-colors">
+                  <MapPin size={14} />
+                </button>
+              </div>
+            </FormField>
+
+            {/* Date Range */}
+            <FormField label="Date-Time Window" hint="Timeframe for satellite passes and AIS data">
+              <div className="flex items-center gap-2">
+                <input
+                  type="date"
+                  value={config.dateRange.start}
+                  onChange={(e) => setConfig({ ...config, dateRange: { ...config.dateRange, start: e.target.value } })}
+                  className="flex-1 px-3 py-2 bg-abyss border border-steel/50 rounded font-mono text-xs text-ice focus:border-signal outline-none"
+                />
+                <span className="text-mute">→</span>
+                <input
+                  type="date"
+                  value={config.dateRange.end}
+                  onChange={(e) => setConfig({ ...config, dateRange: { ...config.dateRange, end: e.target.value } })}
+                  className="flex-1 px-3 py-2 bg-abyss border border-steel/50 rounded font-mono text-xs text-ice focus:border-signal outline-none"
+                />
+              </div>
+            </FormField>
+
+            {/* Satellite Pass */}
+            <FormField label="Satellite Pass">
+              <select
+                value={config.satellitePass}
+                onChange={(e) => setConfig({ ...config, satellitePass: e.target.value })}
+                className="w-full px-3 py-2 bg-abyss border border-steel/50 rounded font-mono text-xs text-ice focus:border-signal outline-none"
+              >
+                <option>S1A-2026-08-15-06:42-ASC</option>
+                <option>S1A-2026-08-15-18:24-DSC</option>
+                <option>S1B-2026-08-14-06:18-ASC</option>
+              </select>
+            </FormField>
+
+            {/* Model Parameters */}
+            <FormField label="Detection Sensitivity" hint="Higher = more detections, more false positives">
+              <div className="flex items-center gap-2">
+                <input
+                  type="range"
+                  min="0.5"
+                  max="0.99"
+                  step="0.01"
+                  value={config.modelParams.sensitivity}
+                  onChange={(e) => setConfig({ ...config, modelParams: { ...config.modelParams, sensitivity: parseFloat(e.target.value) } })}
+                  className="flex-1 accent-signal"
+                />
+                <span className="font-mono text-xs text-ice w-12 text-right">
+                  {(config.modelParams.sensitivity * 100).toFixed(0)}%
+                </span>
+              </div>
+            </FormField>
+
+            <FormField label="Hindcast Duration" hint="Hours to trace back from detection">
+              <div className="flex items-center gap-2">
+                <input
+                  type="range"
+                  min="1"
+                  max="12"
+                  step="1"
+                  value={config.modelParams.hindcastHours}
+                  onChange={(e) => setConfig({ ...config, modelParams: { ...config.modelParams, hindcastHours: parseInt(e.target.value) } })}
+                  className="flex-1 accent-signal"
+                />
+                <span className="font-mono text-xs text-ice w-12 text-right">
+                  {config.modelParams.hindcastHours}h
+                </span>
+              </div>
+            </FormField>
+
+            {/* Summary */}
+            <div className="mt-4 p-3 bg-abyss/50 border border-steel/30 rounded font-mono text-xs text-mute">
+              <div className="text-[10px] uppercase tracking-wider mb-2 text-ice">Pipeline Stages</div>
+              <div className="space-y-1">
+                {PIPELINE_STAGES.map((s) => (
+                  <div key={s.id} className="flex items-center gap-2">
+                    <ChevronRight size={10} className="text-signal" />
+                    <span>{s.name}</span>
+                    <span className="text-mute-dim">— {s.description}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Actions */}
+            <div className="flex gap-2 pt-2">
+              <button
+                onClick={() => setView('empty')}
+                className="flex-1 px-4 py-2 bg-steel/20 border border-steel/50 rounded font-mono text-xs text-ice hover:border-signal transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={startPipeline}
+                className="flex-1 px-4 py-2 bg-signal/10 border border-signal/30 rounded font-mono text-xs text-signal hover:bg-signal/20 transition-colors"
+              >
+                Run Pipeline
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Pipeline View */}
+      {view === 'pipeline' && (
+        <div className="flex flex-col h-full">
+          {/* Header */}
+          <div className="flex items-center justify-between px-3 py-2 border-b border-steel/30 shrink-0">
+            <div className="flex items-center gap-2">
+              <Scan className="w-4 h-4 text-sheen" />
+              <span className="font-mono text-xs text-ice uppercase">Pipeline</span>
+            </div>
+            <div className="flex items-center gap-2">
+              {pipelineState === 'running' && (
+                <button
+                  onClick={cancelPipeline}
+                  className="flex items-center gap-1 px-2 py-1 bg-amber/10 border border-amber/30 rounded text-amber text-[10px] font-mono hover:bg-amber/20 transition-colors"
+                >
+                  <X size={12} />
+                  Cancel
+                </button>
+              )}
+              {pipelineState === 'complete' && (
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={startPipeline}
+                    className="flex items-center gap-1 px-2 py-1 bg-steel/20 border border-steel/50 rounded text-ice text-[10px] font-mono hover:border-signal transition-colors"
+                  >
+                    <RefreshCw size={12} />
+                    Re-run
+                  </button>
+                  <button
+                    onClick={resetPipeline}
+                    className="px-2 py-1 bg-steel/20 border border-steel/50 rounded text-mute text-[10px] font-mono hover:border-signal transition-colors"
+                  >
+                    New
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Overall Progress */}
+          <div className="px-3 py-2 border-b border-steel/30 shrink-0">
+            <div className="flex items-center justify-between mb-1">
+              <span className="font-mono text-[10px] text-mute">Overall Progress</span>
+              <span className="font-mono text-[10px] text-signal">
+                {Math.round(((currentStepIndex + (steps[currentStepIndex]?.progress || 0) / 100) / steps.length) * 100)}%
+              </span>
+            </div>
+            <div className="h-1 bg-steel/20 rounded-full overflow-hidden">
+              <motion.div
+                className="h-full bg-sheen"
+                initial={{ width: 0 }}
+                animate={{ width: `${((currentStepIndex + (steps[currentStepIndex]?.progress || 0) / 100) / steps.length) * 100}%` }}
+              />
+            </div>
+          </div>
+
+          {/* Steps */}
+          <div className="flex-1 overflow-y-auto p-3 space-y-2">
+            {steps.map((step, i) => (
+              <StepCard
+                key={step.id}
+                step={step}
+                index={i}
+                expanded={expandedStep === i}
+                onToggleExpand={() => setExpandedStep(expandedStep === i ? null : i)}
+                onRetry={() => retryStep(i)}
+              />
+            ))}
+          </div>
+
+          {/* Result Summary */}
+          {pipelineState === 'complete' && (
+            <div className="p-3 border-t border-steel/30 bg-signal/5 shrink-0">
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="font-mono text-xs text-signal">Analysis Complete</div>
+                  <div className="font-mono text-[10px] text-mute">
+                    {steps.filter((s) => s.status === 'completed').length} of {steps.length} stages successful
+                  </div>
+                </div>
+                <button className="px-3 py-1.5 bg-signal/10 border border-signal/30 rounded text-signal text-xs font-mono hover:bg-signal/20 transition-colors">
+                  View Results
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 };
