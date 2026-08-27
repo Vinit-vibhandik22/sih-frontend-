@@ -129,6 +129,12 @@ html {
   font-family: var(--font-body);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  scroll-behavior: smooth;
+}
+
+/* Landing2 page specific - font override via data attribute or class */
+.landing2-font {
+  font-family: 'Helvetica Neue ME', 'Helvetica Neue', sans-serif;
 }
 
 body {

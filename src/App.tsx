@@ -1,9 +1,12 @@
 import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom'
-import { useEffect } from 'react'
+import { useEffect, lazy, Suspense } from 'react'
 import { PreviewPage } from './pages/PreviewPage'
 import { LandingPage } from './pages/LandingPage'
 import { AppConsole } from './pages/AppConsole'
 import Lenis from 'lenis'
+
+// Lazy load Landing2 for code splitting
+const Landing2Page = lazy(() => import('./pages/Landing2Page'))
 
 // Smooth scroll wrapper (only for landing page)
 function SmoothScroll({ children, enabled = true }: { children: React.ReactNode; enabled?: boolean }) {
@@ -66,6 +69,16 @@ function App() {
 
         {/* Preview page */}
         <Route path="/preview" element={<PreviewPage />} />
+
+        {/* Landing2 page - scroll-tied video */}
+        <Route
+          path="/landing2"
+          element={
+            <Suspense fallback={<div className="h-screen w-full bg-[#05080F]" />}>
+              <Landing2Page />
+            </Suspense>
+          }
+        />
       </Routes>
     </BrowserRouter>
   )
