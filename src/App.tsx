@@ -47,9 +47,19 @@ function App() {
   return (
     <BrowserRouter>
       <Routes>
-        {/* Landing page with smooth scroll */}
+        {/* Landing page (Landing2Page) - scroll-tied video */}
         <Route
           path="/"
+          element={
+            <Suspense fallback={<div className="h-screen w-full bg-[#05080F]" />}>
+              <Landing2Page />
+            </Suspense>
+          }
+        />
+
+        {/* Original landing page - now at /landing-classic */}
+        <Route
+          path="/landing-classic"
           element={
             <SmoothScroll enabled>
               <LandingPage />
@@ -69,16 +79,6 @@ function App() {
 
         {/* Preview page */}
         <Route path="/preview" element={<PreviewPage />} />
-
-        {/* Landing2 page - scroll-tied video */}
-        <Route
-          path="/landing2"
-          element={
-            <Suspense fallback={<div className="h-screen w-full bg-[#05080F]" />}>
-              <Landing2Page />
-            </Suspense>
-          }
-        />
       </Routes>
     </BrowserRouter>
   )

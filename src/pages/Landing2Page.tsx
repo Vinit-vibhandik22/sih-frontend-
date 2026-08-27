@@ -6,7 +6,7 @@
 
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { ArrowRight, ArrowDown, ChevronUp, X, Radar, AlertTriangle, Crosshair } from 'lucide-react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 
 const DARK = '#1D3045';
 const SIGNAL = '#38E1D0';
@@ -114,11 +114,11 @@ function Navbar({ progress, isMenuOpen, setIsMenuOpen, onLaunchApp }: { progress
         className="absolute top-0 left-0 right-0 z-50 px-6 sm:px-8 md:px-12 pt-8 sm:pt-12 pb-6 flex items-center justify-between pointer-events-auto transition-colors duration-500"
         style={{ color: navColor }}
       >
-        {/* Logo - links to home */}
-        <Link to="/" className="flex items-center gap-3 hover:opacity-80 transition-opacity">
+        {/* Logo */}
+        <div className="flex items-center gap-3 cursor-default">
           <Radar size={28} style={{ color: isLight ? DARK : SIGNAL }} />
           <span className="text-sm tracking-[0.2em] uppercase font-medium">Orbital SAR</span>
-        </Link>
+        </div>
 
         {/* Desktop Navigation */}
         <div className="hidden lg:flex items-center gap-8 xl:gap-10">
@@ -244,9 +244,9 @@ function Navbar({ progress, isMenuOpen, setIsMenuOpen, onLaunchApp }: { progress
             <button onClick={onLaunchApp} className="text-xs tracking-[0.2em] uppercase text-white/60 hover:text-white transition-colors">
               ALERTS
             </button>
-            <Link to="/" className="text-xs tracking-[0.2em] uppercase text-white/60 hover:text-white transition-colors">
-              HOME
-            </Link>
+            <button onClick={() => { window.scrollTo({ top: 0, behavior: 'smooth' }); setIsMenuOpen(false); }} className="text-xs tracking-[0.2em] uppercase text-white/60 hover:text-white transition-colors">
+              TOP
+            </button>
           </div>
         </div>
       </div>
