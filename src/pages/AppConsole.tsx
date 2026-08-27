@@ -7,6 +7,7 @@ import { useEffect } from 'react';
 import { ConsoleLayout } from '../components/layout/ConsoleLayout';
 import { CommandPalette } from '../components/layout/CommandPalette';
 import { KeyboardShortcuts } from '../components/layout/KeyboardShortcuts';
+import { TimelineProvider } from '../components/timeline/Timeline';
 import { useUIStore } from '../store/uiSlice';
 
 export const AppConsole = () => {
@@ -33,11 +34,11 @@ export const AppConsole = () => {
   }, [toggleKeyboardShortcuts, toggleCommandPalette]);
 
   return (
-    <>
+    <TimelineProvider>
       <ConsoleLayout />
       <CommandPalette />
       <KeyboardShortcuts />
-    </>
+    </TimelineProvider>
   );
 };
 

@@ -68,14 +68,7 @@ function App() {
         />
 
         {/* App console routes (no smooth scroll) */}
-        <Route
-          path="/app/*"
-          element={<AppConsole />}
-        >
-          <Route index element={<AppConsole />} />
-          <Route path="cases" element={<AppConsole />} />
-          <Route path="cases/:id" element={<AppConsole />} />
-        </Route>
+        <Route path="/app/*" element={<AppConsole />} />
 
         {/* Preview page */}
         <Route path="/preview" element={<PreviewPage />} />
