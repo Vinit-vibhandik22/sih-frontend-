@@ -19,7 +19,7 @@ interface CommandItem {
 }
 
 export const CommandPalette = () => {
-  const { commandPaletteOpen, toggleCommandPalette: close, panels, setPanelCollapsed } = useUIStore();
+  const { commandPaletteOpen, closeCommandPalette: close, panels, setPanelCollapsed } = useUIStore();
   const [query, setQuery] = useState('');
   const [selectedIndex, setSelectedIndex] = useState(0);
   const inputRef = useRef<HTMLInputElement | null>(null);

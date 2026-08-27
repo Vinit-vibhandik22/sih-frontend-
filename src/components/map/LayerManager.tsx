@@ -411,14 +411,4 @@ export const LayerManager = () => {
   );
 };
 
-// Extend UI store
-import type { UIState } from '../../store/uiSlice';
-
-declare module '../../store/uiSlice' {
-  interface UIState {
-    selectedSatellitePass: string | null;
-    setSelectedSatellitePass: (id: string | null) => void;
-  }
-}
-
 export default LayerManager;

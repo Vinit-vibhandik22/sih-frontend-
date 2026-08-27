@@ -33,6 +33,7 @@ interface UIState {
   toggleCommandPalette: () => void;
   closeCommandPalette: () => void;
   toggleKeyboardShortcuts: () => void;
+  closeKeyboardShortcuts: () => void;
   setActiveAOI: (aoi: string | null) => void;
   setSelectedSatellitePass: (pass: string | null) => void;
 }
@@ -99,6 +100,7 @@ export const useUIStore = create<UIState>()(
       keyboardShortcutsOpen: false,
       toggleKeyboardShortcuts: () =>
         set((state) => ({ keyboardShortcutsOpen: !state.keyboardShortcutsOpen })),
+      closeKeyboardShortcuts: () => set({ keyboardShortcutsOpen: false }),
 
       activeAOI: null,
       setActiveAOI: (aoi) => set({ activeAOI: aoi }),

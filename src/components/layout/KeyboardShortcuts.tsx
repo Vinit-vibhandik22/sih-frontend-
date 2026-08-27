@@ -3,9 +3,10 @@
  * Modal displaying all available keyboard shortcuts.
  */
 
-import { useState, useEffect } from 'react';
+import { useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Command as Cmd } from 'lucide-react';
+import { useUIStore } from '../../store/uiSlice';
 
 interface Shortcut {
   key: string;
@@ -36,28 +37,33 @@ const shortcuts: Shortcut[] = [
 ];
 
 export const KeyboardShortcuts = () => {
-  const [isOpen, setIsOpen] = useState(false);
+  const { keyboardShortcutsOpen, closeKeyboardShortcuts: close } = useUIStore();
 
   const categories = Array.from(new Set(shortcuts.map(s => s.category)));
 
-  // Expose toggle method via window for command palette
+  // Close on Escape
   useEffect(() => {
-    (window as any).toggleKeyboardShortcuts = () => setIsOpen(!isOpen);
-    return () => {
-      delete (window as any).toggleKeyboardShortcuts;
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && keyboardShortcutsOpen) {
+        e.preventDefault();
+        close();
+      }
     };
-  }, [isOpen]);
+
+    window.addEventListener('keydown', handleEscape);
+    return () => window.removeEventListener('keydown', handleEscape);
+  }, [keyboardShortcutsOpen, close]);
 
   return (
     <AnimatePresence>
-      {isOpen && (
+      {keyboardShortcutsOpen && (
         <>
           {/* Backdrop */}
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            onClick={() => setIsOpen(false)}
+            onClick={() => close()}
             className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50"
           />
 
@@ -78,7 +84,7 @@ export const KeyboardShortcuts = () => {
                   </h2>
                 </div>
                 <button
-                  onClick={() => setIsOpen(false)}
+                  onClick={() => close()}
                   className="p-1 hover:bg-steel/20 rounded transition-colors"
                 >
                   <X className="w-4 h-4 text-mute" />

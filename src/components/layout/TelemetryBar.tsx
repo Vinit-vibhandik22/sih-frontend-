@@ -5,6 +5,7 @@
 
 import { useEffect, useState } from 'react';
 import { Command, User, HelpCircle, Radio } from 'lucide-react';
+import { useUIStore } from '../../store/uiSlice';
 
 export const TelemetryBar = () => {
   const [utcTime, setUtcTime] = useState('');
@@ -99,6 +100,3 @@ export const TelemetryBar = () => {
     </header>
   );
 };
-
-// Import UI store
-import { useUIStore } from '../../store/uiSlice';
