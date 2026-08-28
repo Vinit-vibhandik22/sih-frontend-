@@ -5,73 +5,39 @@
 
 import { useRef, useState, useCallback, useEffect, useMemo } from 'react';
 import { DeckGL } from 'deck.gl';
-import { ScatterplotLayer, PathLayer } from '@deck.gl/layers';
+import { ScatterplotLayer, PathLayer, LineLayer, TextLayer, GeoJsonLayer } from '@deck.gl/layers';
 import Map, { ViewState, MapRef } from 'react-map-gl/maplibre';
 import { useUIStore } from '../../store/uiSlice';
-import { graphiteStyle, satelliteStyle, INITIAL_VIEW } from '../../map/styles';
+import { useLayerStore } from '../../store/layerStore';
+import { useFleetStore, VesselState, getVesselList } from '../../store/fleetStore';
+import { oceanStyle, satelliteStyle, INITIAL_VIEW } from '../../map/styles';
+import { mockPorts, mockSpill } from '../../mock/spills';
 import 'maplibre-gl/dist/maplibre-gl.css';
 
-// Vessel data type
-interface VesselData {
-  mmsi: number;
-  name: string;
-  coordinates: [number, number];
-  heading: number;
-  sog: number;
-  cog: number;
-  suspect: boolean;
-  aisGap?: boolean;
-}
-
-// Track data type
-interface TrackData {
-  mmsi: number;
-  path: [number, number][];
-}
-
-// Mock vessels - 9 vessels for Phase 3
-const MOCK_VESSELS: VesselData[] = [
-  { mmsi: 419001251, name: 'OCEAN PRIDE', coordinates: [72.79, 18.91], heading: 45, sog: 12.5, cog: 48, suspect: true, aisGap: true },
-  { mmsi: 419001252, name: 'STAR VOYAGER', coordinates: [72.85, 18.95], heading: 120, sog: 8.3, cog: 118, suspect: false },
-  { mmsi: 419001253, name: 'DEEP BLUE', coordinates: [72.82, 18.88], heading: 180, sog: 10.1, cog: 175, suspect: false },
-  { mmsi: 419001254, name: 'ARABIAN HERITAGE', coordinates: [72.88, 18.92], heading: 270, sog: 15.2, cog: 268, suspect: false },
-  { mmsi: 419001255, name: 'GULF EXPLORER', coordinates: [72.75, 18.85], heading: 90, sog: 6.7, cog: 92, suspect: true, aisGap: true },
-  { mmsi: 419001256, name: 'SEASIDE TRADER', coordinates: [72.92, 18.97], heading: 315, sog: 18.5, cog: 320, suspect: false },
-  { mmsi: 419001257, name: 'INDIAN MARINER', coordinates: [72.68, 18.82], heading: 60, sog: 14.2, cog: 62, suspect: false },
-  { mmsi: 419001258, name: 'BOMBAY TRADER', coordinates: [72.98, 18.89], heading: 200, sog: 9.5, cog: 198, suspect: false },
-  { mmsi: 419001259, name: 'ARABIAN STAR', coordinates: [72.72, 18.96], heading: 340, sog: 11.2, cog: 342, suspect: false },
-];
-
-// Generate historical tracks
-const generateTrack = (vessel: VesselData, steps = 20): TrackData => {
-  const path: [number, number][] = [];
-  for (let i = 0; i <= steps; i++) {
-    const t = i / steps;
-    const lngOffset = (Math.random() - 0.5) * 0.3 * (1 - t);
-    const latOffset = (Math.random() - 0.5) * 0.2 * (1 - t);
-    path.push([
-      vessel.coordinates[0] - lngOffset,
-      vessel.coordinates[1] - latOffset,
-    ]);
-  }
-  return { mmsi: vessel.mmsi, path };
-};
-
-const VESSEL_TRACKS = MOCK_VESSELS.map(generateTrack);
-
 // Current base layer style
-let currentBaseStyle: 'graphite' | 'satellite' = 'graphite';
+let currentBaseStyle: 'ocean' | 'satellite' = 'ocean';
 
 export const RouteMap = () => {
   const { activeAOI } = useUIStore();
   const mapRef = useRef<MapRef>(null);
   const [viewState, setViewState] = useState(INITIAL_VIEW);
   const [cursorCoords, setCursorCoords] = useState<{ lat: number; lng: number } | null>(null);
-  const [mapStyle, setMapStyle] = useState(graphiteStyle as any);
+  const [mapStyle, setMapStyle] = useState(oceanStyle as any);
   const [layerVisibility, setLayerVisibility] = useState({
     vessels: true,
     tracks: true,
   });
+
+  // Layer store for layer visibility
+  const layers = useLayerStore((s) => s.layers);
+  const baseLayer = useLayerStore((s) => s.baseLayer);
+
+  // Fleet store - single source of truth
+  const vessels = useFleetStore((s) => s.vessels);
+  const selectedMmsi = useFleetStore((s) => s.selectedMmsi);
+  const setSelectedMmsi = useFleetStore((s) => s.setSelectedMmsi);
+
+  const vesselList = useMemo(() => Object.values(vessels), [vessels]);
 
   const handleMove = useCallback((evt: { viewState: ViewState }) => {
     setViewState(evt.viewState);
@@ -83,54 +49,178 @@ export const RouteMap = () => {
 
   // Listen for base layer change events from LayerManager
   useEffect(() => {
-    const handleStyleChange = (e: CustomEvent<'graphite' | 'satellite'>) => {
+    const handleStyleChange = (e: CustomEvent<'ocean' | 'satellite'>) => {
       currentBaseStyle = e.detail;
-      setMapStyle(e.detail === 'satellite' ? satelliteStyle : graphiteStyle);
+      setMapStyle(e.detail === 'satellite' ? satelliteStyle : oceanStyle);
     };
     window.addEventListener('map-style-change' as any, handleStyleChange);
     return () => window.removeEventListener('map-style-change' as any, handleStyleChange);
   }, []);
 
-  // deck.gl vessel layer - use ScatterplotLayer for simplicity
+  // Build trail data for PathLayer - only display last 60 points for performance
+  const trailData = useMemo(() => {
+    return vesselList.map(v => ({
+      mmsi: v.mmsi,
+      path: v.trail.slice(-60).map(p => [p.lng, p.lat] as [number, number]),
+      origin: v.origin,
+    })).filter(d => d.path.length > 1);
+  }, [vesselList]);
+
+  // Build vessel positions for ScatterplotLayer
+  const vesselPositions = useMemo(() => {
+    return vesselList
+      .filter(v => v.trail.length > 0)
+      .map(v => {
+        const lastPoint = v.trail[v.trail.length - 1];
+        return {
+          mmsi: v.mmsi,
+          name: v.name,
+          position: [lastPoint.lng, lastPoint.lat] as [number, number],
+          cog: lastPoint.cog,
+          sog: lastPoint.sog,
+          origin: v.origin,
+          isSelected: v.mmsi === selectedMmsi,
+        };
+      });
+  }, [vesselList, selectedMmsi]);
+
+  // deck.gl vessel layer
   const vesselLayer = useMemo(() => {
     if (!layerVisibility.vessels) return null;
 
-    return new ScatterplotLayer<VesselData>({
+    return new ScatterplotLayer<{
+      mmsi: string;
+      name: string;
+      position: [number, number];
+      cog: number;
+      sog: number;
+      origin: 'live' | 'sim';
+      isSelected: boolean;
+    }>({
       id: 'vessels',
-      data: MOCK_VESSELS,
-      getPosition: (d: VesselData) => d.coordinates,
-      getRadius: () => 800,
-      getFillColor: (d: VesselData) => d.suspect ? [242, 100, 48, 255] : [79, 168, 139, 255],
+      data: vesselPositions,
+      getPosition: (d) => d.position,
+      getRadius: (d) => d.isSelected ? 8 : 5,
+      radiusUnits: 'pixels',
+      radiusMinPixels: 3,
+      radiusMaxPixels: 20,
+      getFillColor: (d) => d.isSelected ? [255, 194, 75, 255] : [79, 168, 139, 220],
       getLineColor: [255, 255, 255, 200],
       lineWidthMinPixels: 1,
-      radiusMinPixels: 8,
-      radiusMaxPixels: 24,
       stroked: true,
       pickable: true,
+      onClick: (info) => {
+        if (info.object) {
+          setSelectedMmsi(info.object.mmsi === selectedMmsi ? null : info.object.mmsi);
+        }
+      },
+      updateTriggers: {
+        getRadius: [selectedMmsi],
+        getFillColor: [selectedMmsi],
+      },
     });
-  }, [layerVisibility.vessels]);
+  }, [vesselPositions, layerVisibility.vessels, selectedMmsi, setSelectedMmsi]);
+
+  // deck.gl heading indicator layer
+  const headingLayer = useMemo(() => {
+    if (!layerVisibility.vessels) return null;
+
+    const headingLines = vesselPositions.map(v => ({
+      start: v.position,
+      end: [
+        v.position[0] + Math.sin(v.cog * Math.PI / 180) * 0.005,
+        v.position[1] + Math.cos(v.cog * Math.PI / 180) * 0.005,
+      ] as [number, number],
+      mmsi: v.mmsi,
+    }));
+
+    return new LineLayer({
+      id: 'vessel-headings',
+      data: headingLines,
+      getSourcePosition: (d) => d.start,
+      getTargetPosition: (d) => d.end,
+      getColor: [255, 255, 255, 180],
+      getWidth: 1,
+      widthUnits: 'pixels',
+      widthMinPixels: 1,
+      pickable: false,
+    });
+  }, [vesselPositions, layerVisibility.vessels]);
 
   // deck.gl tracks layer
   const tracksLayer = useMemo(() => {
     if (!layerVisibility.tracks) return null;
 
-    return new PathLayer<TrackData>({
+    return new PathLayer<{
+      mmsi: string;
+      path: [number, number][];
+      origin: 'live' | 'sim';
+    }>({
       id: 'vessel-tracks',
-      data: VESSEL_TRACKS,
+      data: trailData,
       getPath: (d) => d.path,
-      getColor: [79, 168, 139, 100],
-      getWidth: 1,
-      widthMinPixels: 1,
-      widthMaxPixels: 2,
-      pickable: false,
+      getColor: (d) => d.origin === 'live' ? [79, 168, 139, 150] : [79, 168, 139, 95],
+      getWidth: 1.4,
+      widthUnits: 'pixels',
+      widthMinPixels: 1.2,
+      capRounded: true,
+      jointRounded: true,
+      pickable: true,
+      onClick: (info) => {
+        if (info.object) {
+          setSelectedMmsi(info.object.mmsi);
+        }
+      },
     });
-  }, [layerVisibility.tracks]);
+  }, [trailData, layerVisibility.tracks, setSelectedMmsi]);
 
-  const deckLayers = [tracksLayer, vesselLayer].filter(Boolean);
+  // deck.gl ports layer
+  const portsLayer = useMemo(() => {
+    if (!layers.ports?.visible) return null;
+
+    return new ScatterplotLayer({
+      id: 'ports',
+      data: mockPorts,
+      getPosition: (d: typeof mockPorts[0]) => [d.lng, d.lat],
+      getRadius: (d: typeof mockPorts[0]) => d.type === 'mega' ? 8 : d.type === 'major' ? 6 : 4,
+      radiusUnits: 'pixels',
+      radiusMinPixels: 2,
+      radiusMaxPixels: 15,
+      getFillColor: (d: typeof mockPorts[0]) => {
+        if (d.type === 'mega') return [255, 132, 0, 230];
+        if (d.type === 'major') return [255, 194, 75, 200];
+        return [100, 255, 218, 150];
+      },
+      getLineColor: [50, 50, 50, 200],
+      lineWidthMinPixels: 1,
+      stroked: true,
+      pickable: true,
+      opacity: layers.ports?.opacity ?? 100 / 100,
+    });
+  }, [layers.ports?.visible, layers.ports?.opacity]);
+
+  // deck.gl spill polygon layer
+  const spillLayer = useMemo(() => {
+    if (!layers['spill-polygons']?.visible) return null;
+
+    return new GeoJsonLayer({
+      id: 'spill-polygons',
+      data: mockSpill.geometry,
+      filled: true,
+      stroked: true,
+      getFillColor: [242, 100, 48, 100],
+      getLineColor: [242, 100, 48, 200],
+      getLineWidth: 2,
+      lineWidthUnits: 'pixels',
+      pickable: true,
+      opacity: (layers['spill-polygons']?.opacity ?? 80) / 100,
+    });
+  }, [layers['spill-polygons']?.visible, layers['spill-polygons']?.opacity]);
+
+  const deckLayers = [tracksLayer, headingLayer, vesselLayer, portsLayer, spillLayer].filter(Boolean);
 
   return (
     <div className="relative w-full h-full" style={{ backgroundColor: '#17161A' }}>
-      {/* Map with deck.gl overlay */}
       {/* MapLibre base map */}
       <Map
         ref={mapRef}
@@ -208,7 +298,7 @@ export const RouteMap = () => {
             color: '#97918A',
           }}
         >
-          {Math.round(1000 / Math.pow(2, viewState.zoom))} km
+          {Math.round((40075016.686 * Math.cos(viewState.latitude * Math.PI / 180)) / Math.pow(2, viewState.zoom + 8) * 100)} km
         </div>
       </div>
 
@@ -237,6 +327,18 @@ export const RouteMap = () => {
         style={{ color: '#97918A' }}
       >
         © OpenStreetMap contributors · Esri · OpenSeaMap
+      </div>
+
+      {/* Fleet counter */}
+      <div
+        className="absolute top-4 left-1/2 -translate-x-1/2 z-30 px-3 py-1 rounded font-mono text-[10px]"
+        style={{
+          backgroundColor: 'rgba(23, 22, 26, 0.95)',
+          border: '1px solid rgba(58, 55, 64, 0.5)',
+          color: vesselPositions.length > 0 ? '#4FA88B' : '#97918A',
+        }}
+      >
+        TRACKING {vesselPositions.length} VESSELS
       </div>
 
       {/* Layer toggle controls */}

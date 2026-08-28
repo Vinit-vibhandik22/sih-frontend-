@@ -7,6 +7,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { Eye, EyeOff, ChevronRight, ChevronDown, Layers, Globe, Wind, Ship, AlertTriangle, Radar, Sun, Clock, Split, Info } from 'lucide-react';
 import { useUIStore } from '../../store/uiSlice';
+import { useLayerStore, LAYER_IDS, type LayerId } from '../../store/layerStore';
 
 interface Pass {
   id: string;
@@ -41,7 +42,7 @@ const defaultLayers: Layer[] = [
     visible: true,
     opacity: 100,
     children: [
-      { id: 'graphite', name: 'Graphite (OSM)', icon: <Layers className="w-4 h-4" />, visible: true, opacity: 100 },
+      { id: 'ocean', name: 'Ocean (OpenFreeMap)', icon: <Layers className="w-4 h-4" />, visible: true, opacity: 100 },
       { id: 'satellite', name: 'Satellite (Esri)', icon: <Globe className="w-4 h-4" />, visible: false, opacity: 100 },
     ],
   },
@@ -86,15 +87,15 @@ const defaultLayers: Layer[] = [
     ],
   },
   {
-    id: 'vessels',
+    id: 'ais-vessels',
     name: 'AIS Vessels',
     icon: <Ship className="w-4 h-4 text-signal" />,
     visible: true,
     opacity: 100,
     children: [
-      { id: 'vessel-tracks', name: 'Vessel Tracks', icon: <Ship className="w-4 h-4" />, visible: true, opacity: 100 },
-      { id: 'vessel-markers', name: 'Vessel Markers', icon: <Ship className="w-4 h-4" />, visible: true, opacity: 100 },
-      { id: 'anomalies', name: 'AIS Anomalies', icon: <AlertTriangle className="w-4 h-4" />, visible: false, opacity: 100 },
+      { id: 'ais-trails', name: 'Vessel Tracks', icon: <Ship className="w-4 h-4" />, visible: true, opacity: 100 },
+      { id: 'ais-vessels', name: 'Vessel Markers', icon: <Ship className="w-4 h-4" />, visible: true, opacity: 100 },
+      { id: 'ais-gaps', name: 'AIS Anomalies', icon: <AlertTriangle className="w-4 h-4" />, visible: false, opacity: 100 },
     ],
   },
   {
@@ -113,6 +114,9 @@ const defaultLayers: Layer[] = [
 
 export const LayerManager = () => {
   const { setSelectedSatellitePass } = useUIStore();
+
+  // Layer store integration
+  const layerStore = useLayerStore();
 
   const [expanded, setExpanded] = useState<Record<string, boolean>>({
     base: true,
@@ -136,11 +140,13 @@ export const LayerManager = () => {
   }, [selectedPass, setSelectedSatellitePass]);
 
   const toggleVisibility = (layerId: string) => {
-    // Handle base layer switching: only one of graphite/satellite visible at a time
-    if (layerId === 'graphite' || layerId === 'satellite') {
-      const newStyle = layerId === 'graphite' ? 'graphite' : 'satellite';
+    // Handle base layer switching: only one of ocean/satellite visible at a time
+    if (layerId === 'ocean' || layerId === 'satellite') {
+      const newStyle = layerId === 'ocean' ? 'ocean' : 'satellite';
       // Dispatch custom event for RouteMap to pick up
       window.dispatchEvent(new CustomEvent('map-style-change', { detail: newStyle }));
+      // Update layer store base layer
+      layerStore.setBaseLayer(newStyle);
       // Update layer visibility state
       setLayers(prev => prev.map(layer => {
         if (layer.id === 'base' && layer.children) {
@@ -155,6 +161,11 @@ export const LayerManager = () => {
         return layer;
       }));
       return;
+    }
+
+    // Sync to layerStore if it's a known layer ID
+    if (LAYER_IDS.includes(layerId as LayerId)) {
+      layerStore.toggleLayer(layerId as LayerId);
     }
 
     const updateLayers = (ls: Layer[]): Layer[] =>

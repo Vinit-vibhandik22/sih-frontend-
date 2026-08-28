@@ -8,6 +8,7 @@ import { ConsoleLayout } from '../components/layout/ConsoleLayout';
 import { CommandPalette } from '../components/layout/CommandPalette';
 import { KeyboardShortcuts } from '../components/layout/KeyboardShortcuts';
 import { TimelineProvider } from '../components/timeline/Timeline';
+import { TrafficProvider } from '../traffic/TrafficProvider';
 import { useUIStore } from '../store/uiSlice';
 
 export const AppConsole = () => {
@@ -35,9 +36,11 @@ export const AppConsole = () => {
 
   return (
     <TimelineProvider>
-      <ConsoleLayout />
-      <CommandPalette />
-      <KeyboardShortcuts />
+      <TrafficProvider>
+        <ConsoleLayout />
+        <CommandPalette />
+        <KeyboardShortcuts />
+      </TrafficProvider>
     </TimelineProvider>
   );
 };

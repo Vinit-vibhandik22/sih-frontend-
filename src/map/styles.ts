@@ -1,29 +1,31 @@
 import type { StyleSpecification } from 'maplibre-gl';
 
-const OSM = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
+// OpenFreeMap - ocean-focused style (water only, no land details)
+const OPENFREEMAP_OCEAN = 'https://tiles.openfreemap.org/styles/oceano/{z}/{x}/{y}.png';
 const SAT = 'https://services.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}';
 const SEAMARK = 'https://tiles.openseamap.org/seamark/{z}/{x}/{y}.png';
 const ATTRIB = '© OpenStreetMap contributors · Esri · OpenSeaMap';
 
-// Minimal working graphite style - no heavy filters
-export const graphiteStyle: StyleSpecification = {
+// Ocean-focused style - water only, no land details
+export const oceanStyle: StyleSpecification = {
   version: 8,
   glyphs: 'https://tiles.openfreemap.org/fonts/{fontstack}/{range}.pbf',
   sources: {
-    osm: { type: 'raster', tiles: [OSM], tileSize: 256, attribution: ATTRIB, maxzoom: 19 },
+    ocean: { type: 'raster', tiles: [OPENFREEMAP_OCEAN], tileSize: 256, attribution: ATTRIB, maxzoom: 19 },
   },
   layers: [
-    { id: 'bg', type: 'background', paint: { 'background-color': '#201F24' } },
+    { id: 'bg', type: 'background', paint: { 'background-color': '#05080F' } },
     {
-      id: 'osm-graphite',
+      id: 'ocean-base',
       type: 'raster',
-      source: 'osm',
-      paint: {
-        'raster-opacity': 1.0,
-      },
+      source: 'ocean',
+      paint: { 'raster-opacity': 1.0 },
     },
   ],
 };
+
+// Alias for backward compatibility
+export const graphiteStyle = oceanStyle;
 
 export const satelliteStyle: StyleSpecification = {
   version: 8,
@@ -37,7 +39,7 @@ export const satelliteStyle: StyleSpecification = {
 };
 
 export const seamarkOverlay = { id: 'seamark', tiles: [SEAMARK], attribution: ATTRIB };
-export const BASE_STYLES = { graphite: graphiteStyle, satellite: satelliteStyle } as const;
+export const BASE_STYLES = { ocean: oceanStyle, satellite: satelliteStyle } as const;
 export type BaseStyleId = keyof typeof BASE_STYLES;
 
 // Default camera position over Arabian Sea / Mumbai Offshore

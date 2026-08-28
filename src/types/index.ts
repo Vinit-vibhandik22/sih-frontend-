@@ -124,6 +124,17 @@ export interface LayerState {
   currentVectors: boolean;
 }
 
+// Port data for major global ports
+export interface Port {
+  id: string;
+  name: string;
+  country: string;
+  lat: number;
+  lng: number;
+  type: 'mega' | 'major' | 'regional' | 'minor';
+  annualVolumeMT?: number;  // Million tonnes
+}
+
 // Application state for zustand
 export interface AppState {
   // Selection
