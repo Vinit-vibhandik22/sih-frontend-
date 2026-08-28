@@ -41,8 +41,8 @@ const defaultLayers: Layer[] = [
     visible: true,
     opacity: 100,
     children: [
-      { id: 'dark-ocean', name: 'Dark Ocean', icon: <Layers className="w-4 h-4" />, visible: true, opacity: 100 },
-      { id: 'bathymetry', name: 'Bathymetry', icon: <Globe className="w-4 h-4" />, visible: false, opacity: 100 },
+      { id: 'graphite', name: 'Graphite (OSM)', icon: <Layers className="w-4 h-4" />, visible: true, opacity: 100 },
+      { id: 'satellite', name: 'Satellite (Esri)', icon: <Globe className="w-4 h-4" />, visible: false, opacity: 100 },
     ],
   },
   {
@@ -136,6 +136,27 @@ export const LayerManager = () => {
   }, [selectedPass, setSelectedSatellitePass]);
 
   const toggleVisibility = (layerId: string) => {
+    // Handle base layer switching: only one of graphite/satellite visible at a time
+    if (layerId === 'graphite' || layerId === 'satellite') {
+      const newStyle = layerId === 'graphite' ? 'graphite' : 'satellite';
+      // Dispatch custom event for RouteMap to pick up
+      window.dispatchEvent(new CustomEvent('map-style-change', { detail: newStyle }));
+      // Update layer visibility state
+      setLayers(prev => prev.map(layer => {
+        if (layer.id === 'base' && layer.children) {
+          return {
+            ...layer,
+            children: layer.children.map(child => ({
+              ...child,
+              visible: child.id === layerId ? !child.visible : false,
+            })),
+          };
+        }
+        return layer;
+      }));
+      return;
+    }
+
     const updateLayers = (ls: Layer[]): Layer[] =>
       ls.map((layer) => {
         if (layer.id === layerId) {

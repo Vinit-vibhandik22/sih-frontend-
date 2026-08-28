@@ -1,65 +1,71 @@
-/* Oil Spill Detection - Orbital SAR Intelligence Design Tokens */
-/* Dark theme first — mission control aesthetic */
-
+/* Oil Spill Detection - SALVAGE Design System */
+/* Warm industrial maritime aesthetic - no blue */
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap');
 @import "tailwindcss";
 
-/* Google Fonts - Space Grotesk, Inter, IBM Plex Mono */
-@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap');
-
 :root {
-  /* Core Palette - Abyss/Deep ocean from orbit */
-  --abyss: #05080F;
-  --deep: #0A1626;
-  --steel: #13233B;
-  --steel-hover: #1A2E4A;
+  /* SALVAGE Core Palette - Industrial maritime */
+  --hull: #17161A;        /* Darkest - page background */
+  --deck: #201F24;        /* Panel backgrounds */
+  --plate: #2A282F;       /* Elevated surfaces */
+  --rule: #3A3740;        /* Borders, dividers */
+  --ash: #97918A;         /* Muted text */
+  --bone: #EDE7DC;        /* Primary text */
 
-  /* Signal Colors - Radar telemetry */
-  --signal: #38E1D0;
-  --signal-dim: #2BC4B6;
-  --signal-glow: rgba(56, 225, 208, 0.4);
+  /* SALVAGE Signal Colors */
+  --verdigris: #4FA88B;   /* Primary accent - oxidized copper */
+  --hazard: #F26430;      /* Alert/warning - safety orange */
+  --flare: #FFC24B;       /* Highlight - warning yellow */
 
-  /* Alert/Accent - Spill detection */
-  --amber: #FFB020;
-  --amber-dim: #E6A020;
-  --amber-glow: rgba(255, 176, 32, 0.4);
+  /* Legacy mappings for compatibility - SALVAGE replaces old tokens */
+  --abyss: var(--hull);
+  --deep: var(--deck);
+  --steel: var(--plate);
+  --steel-hover: var(--rule);
 
-  /* Iridescent Oil Sheen - The surreal accent */
-  --sheen: #9B6DFF;
-  --sheen-dim: #7B5FD4;
-  --sheen-glow: rgba(155, 109, 255, 0.4);
+  --signal: var(--verdigris);
+  --signal-dim: #3D8A70;
+  --signal-glow: rgba(79, 168, 139, 0.4);
 
-  /* Text Hierarchy */
-  --ice: #E6EDF3;
-  --ice-dim: #C8D4E0;
-  --mute: #8CA0B3;
-  --mute-dim: #6A7F94;
+  --amber: var(--hazard);
+  --amber-dim: #D4542A;
+  --amber-glow: rgba(242, 100, 48, 0.4);
+
+  --sheen: var(--flare);
+  --sheen-dim: #D4A03F;
+  --sheen-glow: rgba(255, 194, 75, 0.4);
+
+  --ice: var(--bone);
+  --ice-dim: #C9C4BB;
+  --mute: var(--ash);
+  --mute-dim: #7A756F;
 
   /* Semantic Mappings */
-  --color-bg-primary: var(--abyss);
-  --color-bg-secondary: var(--deep);
-  --color-bg-tertiary: var(--steel);
-  --color-bg-tertiary-hover: var(--steel-hover);
+  --color-bg-primary: var(--hull);
+  --color-bg-secondary: var(--deck);
+  --color-bg-tertiary: var(--plate);
+  --color-bg-tertiary-hover: var(--rule);
 
-  --color-text-primary: var(--ice);
+  --color-text-primary: var(--bone);
   --color-text-secondary: var(--ice-dim);
-  --color-text-tertiary: var(--mute);
+  --color-text-tertiary: var(--ash);
   --color-text-muted: var(--mute-dim);
 
-  --color-accent-primary: var(--signal);
-  --color-accent-primary-dim: var(--signal-dim);
-  --color-accent-alert: var(--amber);
-  --color-accent-alert-dim: var(--amber-dim);
-  --color-accent-sheen: var(--sheen);
-  --color-accent-sheen-dim: var(--sheen-dim);
+  --color-accent-primary: var(--verdigris);
+  --color-accent-primary-dim: #3D8A70;
+  --color-accent-alert: var(--hazard);
+  --color-accent-alert-dim: #D4542A;
+  --color-accent-sheen: var(--flare);
+  --color-accent-sheen-dim: #D4A03F;
 
-  --color-border: rgba(140, 160, 179, 0.2);
-  --color-border-focus: var(--signal);
+  --color-border: rgba(58, 55, 64, 0.5);
+  --color-border-focus: var(--verdigris);
 
-  /* Elevation/Glow System */
-  --glow-signal: 0 0 20px rgba(56, 225, 208, 0.3);
-  --glow-signal-sm: 0 0 10px rgba(56, 225, 208, 0.2);
-  --glow-amber: 0 0 20px rgba(255, 176, 32, 0.3);
-  --glow-sheen: 0 0 30px rgba(155, 109, 255, 0.25);
+  /* Elevation/Glow System - SALVAGE */
+  --glow-signal: 0 0 20px rgba(79, 168, 139, 0.3);
+  --glow-signal-sm: 0 0 10px rgba(79, 168, 139, 0.2);
+  --glow-amber: 0 0 20px rgba(242, 100, 48, 0.3);
+  --glow-sheen: 0 0 30px rgba(255, 194, 75, 0.25);
 
   /* Surfaces */
   --surface-elevated: 0 4px 20px rgba(0, 0, 0, 0.4);
@@ -80,40 +86,42 @@
   --duration-slower: 600ms;
 }
 
-/* Tailwind v4 Theme Integration */
+/* Tailwind v4 Theme Integration - SALVAGE colors */
 @theme {
-  /* Colors */
-  --color-abyss: var(--abyss);
-  --color-deep: var(--deep);
-  --color-steel: var(--steel);
-  --color-steel-hover: var(--steel-hover);
+  /* SALVAGE Colors */
+  --color-hull: var(--hull);
+  --color-deck: var(--deck);
+  --color-plate: var(--plate);
+  --color-rule: var(--rule);
+  --color-ash: var(--ash);
+  --color-bone: var(--bone);
 
-  --color-signal: var(--signal);
-  --color-signal-dim: var(--signal-dim);
-  --color-signal-glow: var(--signal-glow);
+  --color-verdigris: var(--verdigris);
+  --color-hazard: var(--hazard);
+  --color-flare: var(--flare);
 
-  --color-amber: var(--amber);
-  --color-amber-dim: var(--amber-dim);
-  --color-amber-glow: var(--amber-glow);
+  /* Legacy aliases for compatibility */
+  --color-abyss: var(--hull);
+  --color-deep: var(--deck);
+  --color-steel: var(--plate);
+  --color-steel-hover: var(--rule);
 
-  --color-sheen: var(--sheen);
-  --color-sheen-dim: var(--sheen-dim);
-  --color-sheen-glow: var(--sheen-glow);
+  --color-signal: var(--verdigris);
+  --color-signal-dim: #3D8A70;
+  --color-signal-glow: rgba(79, 168, 139, 0.4);
 
-  --color-ice: var(--ice);
-  --color-ice-dim: var(--ice-dim);
-  --color-mute: var(--mute);
-  --color-mute-dim: var(--mute-dim);
+  --color-amber: var(--hazard);
+  --color-amber-dim: #D4542A;
+  --color-amber-glow: rgba(242, 100, 48, 0.4);
 
-  /* Semantic mappings available as Tailwind classes */
-  --color-bg-primary: var(--color-bg-primary);
-  --color-bg-secondary: var(--color-bg-secondary);
-  --color-bg-tertiary: var(--color-bg-tertiary);
+  --color-sheen: var(--flare);
+  --color-sheen-dim: #D4A03F;
+  --color-sheen-glow: rgba(255, 194, 75, 0.4);
 
-  --color-text-primary: var(--color-text-primary);
-  --color-text-secondary: var(--color-text-secondary);
-  --color-text-tertiary: var(--color-text-tertiary);
-  --color-text-muted: var(--color-text-muted);
+  --color-ice: var(--bone);
+  --color-ice-dim: #C9C4BB;
+  --color-mute: var(--ash);
+  --color-mute-dim: #7A756F;
 
   /* Typography */
   --font-display: 'Space Grotesk', 'Geist', sans-serif;
@@ -124,8 +132,8 @@
 
 /* Base Styles */
 html {
-  background-color: var(--abyss);
-  color: var(--ice);
+  background-color: var(--hull);
+  color: var(--bone);
   font-family: var(--font-body);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
@@ -138,7 +146,7 @@ html {
 }
 
 body {
-  background-color: var(--abyss);
+  background-color: var(--hull);
   min-height: 100vh;
 }
 
@@ -161,7 +169,7 @@ body {
   font-feature-settings: 'tnum' 1;
 }
 
-/* Glow Utilities */
+/* Glow Utilities - SALVAGE palette */
 .glow-signal {
   box-shadow: var(--glow-signal);
 }
@@ -179,11 +187,11 @@ body {
 }
 
 .text-glow-signal {
-  text-shadow: 0 0 20px var(--signal-glow);
+  text-shadow: 0 0 20px rgba(79, 168, 139, 0.5);
 }
 
 .text-glow-amber {
-  text-shadow: 0 0 20px var(--amber-glow);
+  text-shadow: 0 0 20px rgba(242, 100, 48, 0.5);
 }
 
 /* Surface Styles */
@@ -197,27 +205,27 @@ body {
 
 /* Focus States - Always visible */
 *:focus-visible {
-  outline: 2px solid var(--signal);
+  outline: 2px solid var(--verdigris);
   outline-offset: 2px;
 }
 
-/* Scrollbar Styling */
+/* Scrollbar Styling - SALVAGE palette */
 ::-webkit-scrollbar {
   width: 8px;
   height: 8px;
 }
 
 ::-webkit-scrollbar-track {
-  background: var(--abyss);
+  background: var(--hull);
 }
 
 ::-webkit-scrollbar-thumb {
-  background: var(--steel);
+  background: var(--plate);
   border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: var(--mute-dim);
+  background: var(--ash);
 }
 
 /* Reduced Motion */
@@ -231,10 +239,10 @@ body {
   }
 }
 
-/* Selection */
+/* Selection - SALVAGE */
 ::selection {
-  background-color: var(--signal);
-  color: var(--abyss);
+  background-color: var(--verdigris);
+  color: var(--hull);
 }
 
 /* FoldHero Animations */

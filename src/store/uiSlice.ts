@@ -6,6 +6,8 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 
+import { DEFAULT_AOI } from '../map/styles';
+
 type PanelSide = 'left' | 'right' | 'bottom';
 
 interface PanelState {
@@ -102,7 +104,7 @@ export const useUIStore = create<UIState>()(
         set((state) => ({ keyboardShortcutsOpen: !state.keyboardShortcutsOpen })),
       closeKeyboardShortcuts: () => set({ keyboardShortcutsOpen: false }),
 
-      activeAOI: null,
+      activeAOI: DEFAULT_AOI.label,
       setActiveAOI: (aoi) => set({ activeAOI: aoi }),
 
       selectedSatellitePass: null,
