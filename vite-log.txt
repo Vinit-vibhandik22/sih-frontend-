@@ -14,13 +14,16 @@ Port 5180 is in use, trying another one...
   [32m[1mVITE[22m v6.4.3[39m  [2mready in [0m[1m1494[22m[2m[0m ms[22m
 
   [32m➜[39m  [1mLocal[22m:   [36mhttp://localhost:[1m5181[22m/[39m
-[2m  [32m➜[39m  [1mNetwork[22m[2m: use [22m[1m--host[22m[2m to expose[22m
-[2m9:58:33 pm[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/@fs/D:\SIH Frontend\src\components\map\RouteMap.tsx, /src/styles/tokens.css[22m
-[2m9:58:34 pm[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2mvite-log.txt[22m
-[2m9:58:34 pm[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2mvite-log.txt[22m
-[2m9:58:36 pm[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2mvite-log.txt[22m
-[2m10:13:29 pm[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/@fs/D:\SIH Frontend\src\components\map\RouteMap.tsx, /src/styles/tokens.css[22m
-[2m10:13:29 pm[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2mvite-log.txt[22m
+[2m  [32m➜[39m  [1mNetwork[22m[2m: u[2m10:41:11 pm[22m [36m[1m[vite][22m[39m [32mvite.config.js changed, restarting server...[39m
+[2m10:41:11 pm[22m [36m[1m[vite][22m[39m [32mvite.config.js changed, restarting server...[39m
+[2m10:41:14 pm[22m [36m[1m[vite][22m[39m server restarted.
+[2m10:56:59 pm[22m [36m[1m[vite][22m[39m [32mvite.config.js changed, restarting server...[39m
+[2m10:56:59 pm[22m [36m[1m[vite][22m[39m [32mvite.config.js changed, restarting server...[39m
+[2m10:57:01 pm[22m [36m[1m[vite][22m[39m server restarted.
+[2m11:01:36 pm[22m [36m[1m[vite][22m[39m [32mvite.config.js changed, restarting server...[39m
+[2m11:01:36 pm[22m [36m[1m[vite][22m[39m [32mvite.config.js changed, restarting server...[39m
+[2m11:01:37 pm[22m [36m[1m[vite][22m[39m server restarted.
+[90m[2m(client)[22m[39m [32mpage reload [39m[2mvite-log.txt[22m
 [2m10:14:09 pm[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/@fs/D:\SIH Frontend\src\components\map\RouteMap.tsx, /src/styles/tokens.css[22m
 [2m10:14:09 pm[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2mvite-log.txt[22m
 [2m10:14:10 pm[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2mvite-log.txt[22m
@@ -30,3 +33,25 @@ Port 5180 is in use, trying another one...
 [2m10:15:20 pm[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2mvite-log.txt[22m
 [2m10:17:30 pm[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/@fs/D:\SIH Frontend\src\components\map\RouteMap.tsx, /src/styles/tokens.css[22m
 [2m10:17:31 pm[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2mvite-log.txt[22m
+[2m10:32:47 pm[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/styles/tokens.css, /@fs/D:\SIH Frontend\src\components\map\RouteMap.tsx[22m
+[2m10:32:47 pm[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/styles/tokens.css, /@fs/D:\SIH Frontend\src\components\map\RouteMap.tsx[22m
+[2m10:32:47 pm[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/styles/tokens.css, /@fs/D:\SIH Frontend\src\components\map\RouteMap.tsx[22m
+[2m10:32:47 pm[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2mvite-log.txt[22m
+[2m10:40:49 pm[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2mvite.config.ts[22m
+[2m10:40:49 pm[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2mvite-log.txt[22m
+[2m10:40:49 pm[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2mvite-log.txt[22m
+[2m10:41:07 pm[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/styles/tokens.css, /@fs/D:\SIH Frontend\src\components\map\RouteMap.tsx[22m
+[2m10:41:07 pm[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/styles/tokens.css, /@fs/D:\SIH Frontend\src\components\map\RouteMap.tsx[22m
+[2m10:41:07 pm[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/styles/tokens.css, /@fs/D:\SIH Frontend\src\components\map\RouteMap.tsx[22m
+[2m10:41:10 pm[22m [36m[1m[vite][22m[39m [32mvite.config.js changed, restarting server...[39m
+[2m10:41:10 pm[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2mvite-log.txt[22m
+[2m10:41:11 pm[22m [36m[1m[vite][22m[39m [32mvite.config.js changed, restarting server...[39m
+[2m10:41:11 pm[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2mvite-log.txt[22m
+[2m10:41:11 pm[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2mvite-log.txt[22m
+[2m10:41:11 pm[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2mvite-log.txt[22m
+[2m10:41:12 pm[22m [36m[1m[vite][22m[39m server restarted.
+[2m10:56:59 pm[22m [36m[1m[vite][22m[39m [32mvite.config.js changed, restarting server...[39m
+[2m10:57:00 pm[22m [36m[1m[vite][22m[39m [32mvite.config.js changed, restarting server...[39m
+[2m10:57:01 pm[22m [36m[1m[vite][22m[39m server restarted.
+[2m11:01:36 pm[22m [36m[1m[vite][22m[39m [32mvite.config.js changed, restarting server...[39m
+[2m11:01:37 pm[22m [36m[1m[vite][22m[39m server restarted.
