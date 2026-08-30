@@ -1,36 +1,26 @@
 import type { StyleSpecification } from 'maplibre-gl';
 
-// OpenFreeMap - ocean-focused style (water only, no land details)
-const OPENFREEMAP_OCEAN = 'https://tiles.openfreemap.org/styles/oceano/{z}/{x}/{y}.png';
 const SAT = 'https://services.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}';
-const SEAMARK = 'https://tiles.openseamap.org/seamark/{z}/{x}/{y}.png';
-const ATTRIB = '© OpenStreetMap contributors · Esri · OpenSeaMap';
+const ATTRIB_NATURAL_EARTH = '© Natural Earth · Esri';
 
-// Ocean-focused style - water only, no land details
+/**
+ * Flat ocean background style - no tile sources, cannot fail
+ * Land rendered via deck.gl GeoJsonLayer with bundled geometry
+ */
 export const oceanStyle: StyleSpecification = {
   version: 8,
-  glyphs: 'https://tiles.openfreemap.org/fonts/{fontstack}/{range}.pbf',
-  sources: {
-    ocean: { type: 'raster', tiles: [OPENFREEMAP_OCEAN], tileSize: 256, attribution: ATTRIB, maxzoom: 19 },
-  },
+  sources: {},
   layers: [
-    { id: 'bg', type: 'background', paint: { 'background-color': '#05080F' } },
-    {
-      id: 'ocean-base',
-      type: 'raster',
-      source: 'ocean',
-      paint: { 'raster-opacity': 1.0 },
-    },
+    { id: 'water-bg', type: 'background', paint: { 'background-color': '#0E1A1C' } },
   ],
 };
 
-// Alias for backward compatibility
-export const graphiteStyle = oceanStyle;
+export const chartStyle = oceanStyle; // Alias for clarity
 
 export const satelliteStyle: StyleSpecification = {
   version: 8,
   sources: {
-    sat: { type: 'raster', tiles: [SAT], tileSize: 256, attribution: ATTRIB, maxzoom: 19 },
+    sat: { type: 'raster', tiles: [SAT], tileSize: 256, attribution: ATTRIB_NATURAL_EARTH, maxzoom: 19 },
   },
   layers: [
     { id: 'bg', type: 'background', paint: { 'background-color': '#17161A' } },
@@ -38,8 +28,7 @@ export const satelliteStyle: StyleSpecification = {
   ],
 };
 
-export const seamarkOverlay = { id: 'seamark', tiles: [SEAMARK], attribution: ATTRIB };
-export const BASE_STYLES = { ocean: oceanStyle, satellite: satelliteStyle } as const;
+export const BASE_STYLES = { chart: chartStyle, satellite: satelliteStyle } as const;
 export type BaseStyleId = keyof typeof BASE_STYLES;
 
 // Default camera position over Arabian Sea / Mumbai Offshore

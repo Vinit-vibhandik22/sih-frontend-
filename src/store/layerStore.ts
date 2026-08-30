@@ -6,6 +6,7 @@
 import { create } from 'zustand';
 
 export const LAYER_IDS = [
+  'land',
   'ports',
   'spill-polygons',
   'spill-mask',
@@ -31,18 +32,19 @@ type LayerState = {
 
 type LayerStoreState = {
   layers: Record<LayerId, LayerState>;
-  baseLayer: 'ocean' | 'satellite' | 'bathymetry';
+  baseLayer: 'chart' | 'satellite';
 
   // Actions
   setLayerVisible: (id: LayerId, visible: boolean) => void;
   setLayerOpacity: (id: LayerId, opacity: number) => void;
   toggleLayer: (id: LayerId) => void;
   resetLayers: () => void;
-  setBaseLayer: (layer: 'ocean' | 'satellite' | 'bathymetry') => void;
+  setBaseLayer: (layer: 'chart' | 'satellite') => void;
 };
 
 // Default layer configuration
 const defaultLayers: Record<LayerId, LayerState> = {
+  land: { visible: true, opacity: 100 },
   ports: { visible: true, opacity: 100 },
   'spill-polygons': { visible: true, opacity: 80 },
   'spill-mask': { visible: false, opacity: 60 },
@@ -61,7 +63,7 @@ const defaultLayers: Record<LayerId, LayerState> = {
 
 export const useLayerStore = create<LayerStoreState>()((set) => ({
   layers: { ...defaultLayers },
-  baseLayer: 'ocean',
+  baseLayer: 'chart',
 
   setLayerVisible: (id: LayerId, visible: boolean) => {
     set((state) => ({
@@ -88,7 +90,7 @@ export const useLayerStore = create<LayerStoreState>()((set) => ({
     set({ layers: { ...defaultLayers } });
   },
 
-  setBaseLayer: (layer: 'ocean' | 'satellite' | 'bathymetry') => {
+  setBaseLayer: (layer: 'chart' | 'satellite') => {
     set({ baseLayer: layer });
   },
 }));

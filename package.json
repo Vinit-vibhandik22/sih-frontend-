@@ -4,6 +4,7 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
+    "prebuild": "node scripts/minify-geo.mjs",
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
@@ -11,6 +12,7 @@
   },
   "dependencies": {
     "@deck.gl/core": "^9.3.10",
+    "@deck.gl/extensions": "^9.3.10",
     "@deck.gl/layers": "^9.3.10",
     "@fontsource/ibm-plex-mono": "^5.1.0",
     "@fontsource/inter": "^5.1.0",
