@@ -96,8 +96,9 @@ export const useLayerStore = create<LayerStoreState>()((set) => ({
 }));
 
 // Helper to get visibility for deck.gl
+// PHASE 3.4: visibility defaults to TRUE (fail-open instead of fail-closed)
 export const isLayerVisible = (state: LayerStoreState, id: LayerId): boolean => {
-  return state.layers[id]?.visible ?? false;
+  return state.layers[id]?.visible ?? true;
 };
 
 export const getLayerOpacity = (state: LayerStoreState, id: LayerId): number => {

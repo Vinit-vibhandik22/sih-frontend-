@@ -4,7 +4,7 @@
  */
 
 import { useState, useRef, MouseEvent as ReactMouseEvent, useEffect } from 'react';
-import { ChevronLeft, MoreHorizontal, X } from 'lucide-react';
+import { ChevronLeft, ChevronRight, MoreHorizontal, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useUIStore } from '../../store/uiSlice';
 
@@ -90,10 +90,11 @@ export const ResizablePanel = ({ side, children, title, tabs }: ResizablePanelPr
             : 'border-l'
           : 'border-t'
         }
+        ${panel.collapsed && isHorizontal ? 'w-0 min-w-0 overflow-visible' : ''}
       `}
-      style={sizeStyle}
+      style={panel.collapsed ? { overflow: 'visible' } : sizeStyle}
     >
-      {/* Collapse Handle (always visible when collapsed is false) */}
+      {/* Collapse Handle (visible when expanded) */}
       {!panel.collapsed && side !== 'bottom' && (
         <button
           onClick={handleToggleCollapse}
@@ -105,6 +106,7 @@ export const ResizablePanel = ({ side, children, title, tabs }: ResizablePanelPr
             transition-colors
             ${side === 'left' ? '-right-3' : '-left-3'}
           `}
+          title={side === 'left' ? 'Collapse left panel' : 'Collapse right panel'}
         >
           {side === 'left' ? <ChevronLeft className="w-3 h-3" /> : <ChevronLeft className="w-3 h-3 rotate-180" />}
         </button>

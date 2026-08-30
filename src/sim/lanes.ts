@@ -163,6 +163,56 @@ export const SHIPPING_LANES: Lane[] = [
       [103.8, 1.3],     // Singapore
     ],
   },
+  // AOI-local lanes: Mumbai Offshore Network
+  {
+    id: 'lane-mumbai-gulf-approach',
+    name: 'Mumbai → Gulf Approach',
+    waypoints: [
+      [72.8, 19.0],    // Mumbai outer anchorage
+      [69.5, 20.0],    // NW approach
+      [67.0, 20.5],    // Pakistan border zone
+    ],
+  },
+  {
+    id: 'lane-mumbai-kandla-local',
+    name: 'Mumbai → Kandla Coastal',
+    waypoints: [
+      [72.8, 19.0],    // Mumbai
+      [71.0, 20.5],    // Gulf of Khambhat
+      [70.0, 21.0],    // Mid-gulf
+      [68.5, 22.0],    // Kandla approach
+    ],
+  },
+  {
+    id: 'lane-jnpt-approach',
+    name: 'JNPT Approach Fan',
+    waypoints: [
+      [72.8, 18.95],   // JNPT
+      [71.0, 18.5],    // SW approach
+      [72.5, 17.5],    // S approach
+      [74.0, 18.0],    // SE approach
+    ],
+  },
+  {
+    id: 'lane-mumbai-colombo-local',
+    name: 'Mumbai → Colombo (Local)',
+    waypoints: [
+      [72.8, 18.5],    // Mumbai offshore
+      [73.5, 17.0],    // SW route
+      [74.5, 16.0],    // Local passage
+      [75.0, 15.0],    // Within AOI
+    ],
+  },
+  {
+    id: 'lane-fishing-mumbai-inshore',
+    name: 'Mumbai Inshore Fishing',
+    waypoints: [
+      [71.5, 18.5],    // W of Mumbai
+      [72.0, 19.0],    // N coast
+      [72.5, 18.5],    // E of Mumbai
+      [72.0, 18.0],    // S of Mumbai (near 72.4°E)
+    ],
+  },
 ];
 
 /**
@@ -247,12 +297,14 @@ export function generateScenarioFleet(): Array<{
   const vessels: ReturnType<typeof generateScenarioFleet> = [];
 
   // PRIME SUSPECT: MT KAVERI PRIDE
-  // On Mumbai-Colombo lane, near origin
+  // On local Mumbai-Colombo lane (idx 17) to STAY WITHIN AOI BOX
+  // Local lane coordinates: [72.8,18.5] → [73.5,17] → [74.5,16] → [75,15]
+  // All waypoints are inside AOI (68-75°E, 15-22°N) vs global lane which goes to 6°N
   vessels.push({
     mmsi: '419001234',
     name: 'MT KAVERI PRIDE',
-    laneIdx: 1, // Mumbai → Colombo
-    progress: 0.35,
+    laneIdx: 17, // Mumbai → Colombo LOCAL (within AOI)
+    progress: 0.65, // Position near [74.8, 16.0] - well inside AOI lat 15-22
     speed: 12,
     type: 0, // TANKER
     isSuspect: true,
@@ -339,19 +391,46 @@ export function generateScenarioFleet(): Array<{
     type: 1, // CARGO
   });
 
-  // Fill remaining to 216 with random vessels across all lanes
-  const targetCount = 216;
-  const remaining = targetCount - vessels.length;
+  // AOI lanes: indices 0,1,5,14,15,16,17,18 (hormuz-mumbai, mumbai-colombo, kandla-gulf, + 5 locals)
+  // Global lanes: indices 2-4, 6-13 (colombo-singapore, suez-arabian, cape-east, etc.)
+  const AOI_LANES = [0, 1, 5, 14, 15, 16, 17, 18];
+  const GLOBAL_LANES = [2, 3, 4, 6, 7, 8, 9, 10, 11, 12, 13];
 
-  for (let i = 0; i < remaining; i++) {
-    const laneIdx = Math.floor(rng.next() * SHIPPING_LANES.length);
+  // Target: 140 vessels in AOI, 76 on global trunk routes = 216 total
+  const targetCount = 216;
+  const aoiTarget = 140;
+  const globalTarget = 76;
+
+  // Check which scenario vessels are on AOI lanes
+  const scenarioInAoi = vessels.filter(v => AOI_LANES.includes(v.laneIdx)).length;
+  const scenarioInGlobal = vessels.length - scenarioInAoi;
+
+  // Add remaining AOI vessels to reach 140 (use only local lanes 14-18 for better AOI coverage)
+  const aoiToAdd = aoiTarget - scenarioInAoi;
+  for (let i = 0; i < aoiToAdd; i++) {
+    // Always use local lanes 14-18 (Mumbai offshore network) - these are ALL within AOI
+    const laneIdx = 14 + (i % 5); // Distribute evenly across 5 local lanes
+    vessels.push({
+      mmsi: (419001300 + i).toString(),
+      name: `${VESSEL_ADJECTIVES[Math.floor(rng.next() * VESSEL_ADJECTIVES.length)]} ${VESSEL_NOUNS[Math.floor(rng.next() * VESSEL_NOUNS.length)]}`,
+      laneIdx,
+      progress: rng.next(),
+      speed: 4 + rng.next() * 16,
+      type: Math.floor(rng.next() * 7),
+    });
+  }
+
+  // Add global vessels to reach 76 total
+  const globalToAdd = globalTarget - scenarioInGlobal;
+  for (let i = 0; i < globalToAdd && vessels.length < targetCount; i++) {
+    const laneIdx = GLOBAL_LANES[Math.floor(rng.next() * GLOBAL_LANES.length)];
     vessels.push({
       mmsi: (419000100 + i).toString(),
       name: `${VESSEL_ADJECTIVES[Math.floor(rng.next() * VESSEL_ADJECTIVES.length)]} ${VESSEL_NOUNS[Math.floor(rng.next() * VESSEL_NOUNS.length)]}`,
       laneIdx,
-      progress: rng.next(), // Uniform spread across lane
-      speed: 8 + rng.next() * 12, // 8-20 knots
-      type: Math.floor(rng.next() * 7), // Random type
+      progress: rng.next(),
+      speed: 8 + rng.next() * 12,
+      type: Math.floor(rng.next() * 7),
     });
   }
 

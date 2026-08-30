@@ -13,7 +13,43 @@
     <link href="https://db.onlinewebfonts.com/c/95cecf452d3208890088a5b4c19c7ecf?family=Helvetica+Neue+ME" rel="stylesheet" />
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root">
+      <!-- PHASE 1: Boot fallback - visible if React fails to mount -->
+      <div id="boot-fallback" style="
+        position: fixed;
+        inset: 0;
+        background: #201F24;
+        color: #EDE7DC;
+        font: 14px 'JetBrains Mono', monospace;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 16px;
+        z-index: 99999;
+      ">
+        <div style="height: 4px; width: 200px; background: #4FA88B; animation: pulse 1.5s ease-in-out infinite;"></div>
+        <div style="font-size: 18px; color: #4FA88B;">BOOTING CONSOLE…</div>
+        <div id="boot-error" style="color: #97918A; font-size: 12px; display: none;"></div>
+        <style>
+          @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.3; }
+          }
+        </style>
+      </div>
+    </div>
     <script type="module" src="/src/main.tsx"></script>
+    <!-- Boot timeout - if React doesn't mount in 5s, show warning -->
+    <script>
+      setTimeout(function() {
+        const fallback = document.getElementById('boot-fallback');
+        const errorDiv = document.getElementById('boot-error');
+        if (fallback && fallback.parentNode) {
+          errorDiv.textContent = 'BOOT TIMEOUT (React may have crashed - check console)';
+          errorDiv.style.display = 'block';
+        }
+      }, 5000);
+    </script>
   </body>
 </html>

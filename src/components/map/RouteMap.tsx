@@ -5,13 +5,15 @@
  */
 
 import { useRef, useState, useCallback, useEffect, useMemo } from 'react';
-import { Deck } from '@deck.gl/core';
+import { MapboxOverlay } from '@deck.gl/mapbox';
+import { GeoJsonLayer, ScatterplotLayer, PathLayer, IconLayer } from '@deck.gl/layers';
 import Map, { ViewState, MapRef } from 'react-map-gl/maplibre';
 import { useUIStore } from '../../store/uiSlice';
 import { useLayerStore } from '../../store/layerStore';
 import { fleetBuffers, TYPE_COLORS, VESSEL_TYPES } from '../../fleet/FleetBuffers';
 import { SimEngine } from '../../sim/SimEngine';
 import { chartStyle, satelliteStyle, INITIAL_VIEW } from '../../map/styles';
+import { ZoomSlider } from './ZoomSlider';
 import 'maplibre-gl/dist/maplibre-gl.css';
 
 // Land geometry - lazy loaded
@@ -27,14 +29,28 @@ if (typeof window !== 'undefined') {
 
 async function loadLandGeometry() {
   if (land110m) return;
-  land110m = (await import('../../data/land-110m.min.json')).default;
-  land50m = (await import('../../data/land-50m.min.json')).default;
+  const mod110 = await import('../../data/land-110m.min.json');
+  const mod50 = await import('../../data/land-50m.min.json');
+  // Vite JSON imports: access .default for the actual data
+  land110m = mod110.default || mod110;
+  land50m = mod50.default || mod50;
+  // Validate loaded data has expected GeoJSON structure
+  if (!land110m?.features || !land50m?.features) {
+    console.error('Invalid land geometry loaded:', { land110m, land50m });
+    land110m = { type: 'FeatureCollection', features: [] };
+    land50m = { type: 'FeatureCollection', features: [] };
+  }
   // Merge Natural Earth + India ports
-  const indiaPorts = (await import('../../data/ports-india.json')).default;
-  const nePorts = (await import('../../data/ports-ne.min.json')).default;
+  const indiaMod = await import('../../data/ports-india.json');
+  const neMod = await import('../../data/ports-ne.min.json');
+  const indiaPorts = indiaMod?.default || indiaMod;
+  const nePorts = neMod?.default || neMod;
+  const neFeatures = nePorts?.features || [];
+  const indiaFeatures = indiaPorts?.features || [];
   portsGeo = {
     type: 'FeatureCollection',
-    features: [...nePorts.features, ...indiaPorts.features]
+    features: [...neFeatures, ...indiaFeatures]
+      .filter((f: any) => f?.geometry?.type) // Only valid features with geometry
       .map((f: any) => ({
         type: 'Feature',
         properties: { name: f.properties?.name || '' },
@@ -56,82 +72,141 @@ const COLORS = {
 export const RouteMap = () => {
   const { activeAOI } = useUIStore();
   const mapRef = useRef<MapRef>(null);
-  const deckRef = useRef<Deck | null>(null);
-  const [viewState, setViewState] = useState(INITIAL_VIEW);
+  const overlayRef = useRef<MapboxOverlay | null>(null);
+  // Latest deck layers, mirrored into a ref so map event handlers (set up once)
+  // can re-push the current layers after an async style (re)load.
+  const deckLayersRef = useRef<any[]>([]);
+  // R9: Use initialViewState, not controlled state - prevents snap-back
+  const [viewState, setViewState] = useState<{
+    longitude: number;
+    latitude: number;
+    zoom: number;
+    bearing: number;
+    pitch: number;
+  }>(INITIAL_VIEW);
   const [cursorCoords, setCursorCoords] = useState<{ lat: number; lng: number } | null>(null);
   const [isLoaded, setIsLoaded] = useState(false);
   const [baseLayer, setBaseLayer] = useState<'chart' | 'satellite'>('chart');
   const [zoom, setZoom] = useState(INITIAL_VIEW.zoom);
 
-  // Layer visibility from store
+  // R9: Track if component is mounted to avoid HMR-induced remounting
+  const isStableRef = useRef(false);
+
+  // Layer visibility from store - default to VISIBLE (true) for unknown layers
   const layers = useLayerStore((s) => s.layers);
   const setBaseLayerStore = useLayerStore((s) => s.setBaseLayer);
-  const vis = useCallback((id: string) => layers[id as keyof typeof layers]?.visible ?? false, [layers]);
+  const vis = useCallback((id: string) => layers[id as keyof typeof layers]?.visible ?? true, [layers]);
   const op = useCallback((id: string) => (layers[id as keyof typeof layers]?.opacity ?? 100) / 100, [layers]);
 
   // Cursor throttled ref
   const cursorRef = useRef<HTMLDivElement>(null);
 
-  // Load geometry and init sim
+  // Track data loading for layer rebuild
+  const [dataVersion, setDataVersion] = useState(0);
+
+  // PHASE 3.2: Map not drawing notice state
+  const [mapHealth, setMapHealth] = useState<{ styleLoaded: boolean; visibleLayers: number; canvasOk: boolean } | null>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  // R9: Camera interaction latch - once user moves camera, automatic moves are disabled
+  const userHasMovedCamera = useRef(false);
+  const didInitialFit = useRef(false);
+
+  // Load geometry and init sim - run once only
   useEffect(() => {
+    if (isStableRef.current) return;
+    isStableRef.current = true;
+
     loadLandGeometry().then(() => {
       setIsLoaded(true);
-      // Pre-seed trails
-      fleetBuffers.count = 0;
+      setDataVersion(v => v + 1); // Trigger layer rebuild after data loads
+      // Pre-seed trails - NEVER reset count here; SimEngine manages count
       const engine = new SimEngine(12345, fleetBuffers);
       engine.preseedTrails();
       engine.start();
       console.log('SEEDED', fleetBuffers.count, 'vessels');
-
-      // Visibility change handler
-      const handleVisibility = () => {
-        if (!document.hidden) {
-          // Fast-forward would happen here
-        }
-      };
-      document.addEventListener('visibilitychange', handleVisibility);
-      return () => document.removeEventListener('visibilitychange', handleVisibility);
     });
+
+    // Visibility change handler
+    const handleVisibility = () => {
+      if (!document.hidden) {
+        // Fast-forward would happen here
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibility);
+    return () => document.removeEventListener('visibilitychange', handleVisibility);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Deck init
+  // Deck init - runs when map becomes available
+  const mapReadyRef = useRef(false);
   useEffect(() => {
-    if (!mapRef.current) return;
+    if (!mapRef.current || mapReadyRef.current || !isLoaded) return;
+    mapReadyRef.current = true;
+
     const map = mapRef.current.getMap();
 
-    const deck = new Deck({
-      gl: (map as any).painter.context.gl,
+    // 2.1: MapboxOverlay - inherits MapLibre camera, no dual state
+    const overlay = new MapboxOverlay({
+      interleaved: false,
       layers: [],
-      useDevicePixels: window.devicePixelRatio > 1.5 ? 1.5 : true,
-      pickingRadius: 6,
-      onViewStateChange: ({ viewState: vs }: { viewState: any }) => {
-        setViewState({
-          longitude: vs.longitude,
-          latitude: vs.latitude,
-          zoom: vs.zoom,
-          bearing: vs.bearing ?? 0,
-          pitch: vs.pitch ?? 0,
-        });
-        setZoom(vs.zoom);
-      },
     });
+    map.addControl(overlay);
+    overlayRef.current = overlay;
 
-    deckRef.current = deck;
+    // PHASE 1: Expose handles for diagnostic probes (after overlay created)
+    (window as any).__map = map;
+    (window as any).__overlay = overlay;
+    (window as any).__fleet = fleetBuffers;
 
-    // Sync deck with map camera
-    map.on('move', () => {
+    // Sync viewport for dependent calculations (scale bar, layer visibility, UI)
+    const syncViewport = () => {
       const c = map.getCenter();
       const z = map.getZoom();
-      deck.setProps({
-        viewState: {
-          longitude: c.lng,
-          latitude: c.lat,
-          zoom: z,
-          bearing: map.getBearing(),
-          pitch: map.getPitch(),
-        },
+      setViewState({
+        longitude: c.lng,
+        latitude: c.lat,
+        zoom: z,
+        bearing: map.getBearing() ?? 0,
+        pitch: map.getPitch() ?? 0,
       });
+      setZoom(z);
+    };
+
+    // R9: Interaction latch - mark user camera control
+    map.on('movestart', (e: any) => {
+      if (e.originalEvent) {
+        userHasMovedCamera.current = true;
+      }
     });
+
+    // R9: Sync React state from map (display only, not control)
+    map.on('zoom', syncViewport);
+    map.on('move', syncViewport);
+    syncViewport(); // Initial sync
+
+    // Re-push deck layers + refresh health whenever the style finishes (re)loading.
+    // Swapping the base layer calls setStyle(), which drops the overlay's layers and
+    // leaves isStyleLoaded() transiently false; without re-pushing on idle/styledata
+    // the map goes blank after a chart<->satellite toggle and the health notice sticks.
+    const refreshMapState = () => {
+      const styleLoaded = !!map.isStyleLoaded();
+      if (overlayRef.current && styleLoaded) {
+        try {
+          overlayRef.current.setProps({ layers: deckLayersRef.current });
+        } catch (e) {
+          console.error('[DECK] re-push on idle failed:', e);
+        }
+      }
+      const canvasRect = map.getCanvas()?.getBoundingClientRect();
+      setMapHealth({
+        styleLoaded,
+        visibleLayers: deckLayersRef.current.filter((l: any) => l.props.visible !== false).length,
+        canvasOk: !!(canvasRect && canvasRect.width > 10 && canvasRect.height > 10),
+      });
+    };
+    map.on('idle', refreshMapState);
+    map.on('styledata', refreshMapState);
 
     // Listen for style changes from LayerManager
     const handleStyle = (e: CustomEvent<'chart' | 'satellite'>) => {
@@ -142,19 +217,26 @@ export const RouteMap = () => {
 
     return () => {
       window.removeEventListener('map-style-change' as any, handleStyle);
-      deck.finalize();
+      map.off('idle', refreshMapState);
+      map.off('styledata', refreshMapState);
+      overlay.finalize();
     };
-  }, []);
+  }, [mapRef.current]);
+
+  // Helper: read zoom from map for layer decisions (never state)
+  const getMapZoom = () => mapRef.current?.getMap()?.getZoom() ?? INITIAL_VIEW.zoom;
 
   // Build layers - memoized by dependencies
   const deckLayers = useMemo(() => {
     if (!isLoaded) return [];
-    const { GeoJsonLayer, ScatterplotLayer, PathLayer } = require('@deck.gl/layers');
 
+    // Read zoom directly from map at build time (not state)
+    const currentZoom = getMapZoom();
     const out = [];
 
     // Land layers (two permanent layers, toggled by visible)
-    if (vis('land')) {
+    // R9: Hide land layers in satellite mode - Esri provides land imagery
+    if (vis('land') && baseLayer !== 'satellite' && land110m && land50m) {
       landTessCount += 1; // Counter for debugging
       out.push(
         new GeoJsonLayer({
@@ -166,8 +248,10 @@ export const RouteMap = () => {
           getLineColor: COLORS.coast,
           lineWidthMinPixels: 0.8,
           pickable: false,
-          visible: zoom < 5,
+          visible: currentZoom < 5,
           opacity: op('land'),
+          // Disable workers to avoid minification issues in production
+          _workerUrl: false,
         }),
         new GeoJsonLayer({
           id: 'land-fine',
@@ -178,14 +262,16 @@ export const RouteMap = () => {
           getLineColor: COLORS.coast,
           lineWidthMinPixels: 0.8,
           pickable: false,
-          visible: zoom >= 5,
+          visible: currentZoom >= 5,
           opacity: op('land'),
+          // Disable workers to avoid minification issues in production
+          _workerUrl: false,
         })
       );
     }
 
     // Ports layer
-    if (vis('ports')) {
+    if (vis('ports') && portsGeo) {
       out.push(
         new ScatterplotLayer({
           id: 'ports',
@@ -202,6 +288,8 @@ export const RouteMap = () => {
           pickable: true,
           visible: vis('ports'),
           opacity: op('ports'),
+          // Disable workers to avoid minification issues in production
+          _workerUrl: false,
         })
       );
     }
@@ -229,13 +317,14 @@ export const RouteMap = () => {
           pickable: false,
           visible: vis('ais-trails'),
           opacity: op('ais-trails'),
+          // Disable workers to avoid minification issues in production
+          _workerUrl: false,
         })
       );
     }
 
     // Vessel layer (binary attributes, arrowheads)
     if (vis('ais-vessels') && fleetBuffers.count > 0) {
-      const { IconLayer } = require('@deck.gl/layers');
       // Create simple circle atlas
       const canvas = document.createElement('canvas');
       canvas.width = 24;
@@ -261,7 +350,7 @@ export const RouteMap = () => {
           iconMapping: { circle: { x: 0, y: 0, width: 24, height: 24, mask: false } },
           getIcon: () => 'circle',
           sizeUnits: 'pixels',
-          getSize: zoom < 3 ? 2 : zoom < 6 ? 9 : 12,
+          getSize: currentZoom < 3 ? 2 : currentZoom < 6 ? 9 : 12,
           sizeMinPixels: 2,
           sizeMaxPixels: 15,
           billboard: false,
@@ -274,17 +363,114 @@ export const RouteMap = () => {
               fleetBuffers.setSelected(mmsi);
             }
           },
+          // Disable workers to avoid minification issues in production
+          _workerUrl: false,
         })
       );
     }
 
     return out;
-  }, [isLoaded, zoom, vis('land'), vis('ports'), vis('ais-trails'), vis('ais-vessels'), op]);
+  }, [isLoaded, dataVersion, zoom, baseLayer, vis('land'), vis('ports'), vis('ais-trails'), vis('ais-vessels'), op]);
 
-  // Update deck layers
+  // Update deck layers with dev assertions
   useEffect(() => {
-    if (!deckRef.current) return;
-    deckRef.current.setProps({ layers: deckLayers });
+    deckLayersRef.current = deckLayers; // keep ref current for idle/styledata re-push
+    if (!overlayRef.current) return;
+    // Guard: don't update deck if map style isn't loaded yet
+    const map = mapRef.current?.getMap();
+    if (map && !map.isStyleLoaded()) {
+      console.log('[DECK] Skipping update - style not loaded');
+      return;
+    }
+    try {
+      overlayRef.current.setProps({ layers: deckLayers });
+    } catch (e) {
+      console.error('[DECK] Failed to set layers:', e);
+    }
+
+    // PHASE 3.1: Dev-only render assertion
+    if (import.meta.env.DEV) {
+      const visibleCount = deckLayers.filter((l: any) => l.props.visible !== false).length;
+      if (visibleCount === 0) {
+        console.error('[DECK] pushed 0 visible layers', deckLayers.map((l: any) => l.id));
+      }
+      // R9: Fleet count fell to 0 check
+      if (fleetBuffers.count === 0) {
+        console.error('[FLEET] count fell to 0');
+      }
+      const map = mapRef.current?.getMap();
+      if (map) {
+        const r = map.getCanvas().getBoundingClientRect();
+        if (r.width < 10 || r.height < 10) {
+          console.error('[MAP] container has no size', r);
+        }
+        // 3.1: Camera divergence check
+        const deck = (overlayRef.current as any)._deck;
+        if (deck && deck.viewManager) {
+          const vp = deck.viewManager.getViewports?.()[0];
+          if (vp) {
+            const mZoom = map.getZoom();
+            const mCenter = map.getCenter();
+            const dZoom = vp.zoom;
+            const dLng = vp.longitude;
+            const dLat = vp.latitude;
+            if (Math.abs(mZoom - dZoom) > 0.01 || Math.abs(mCenter.lng - dLng) > 0.0001 || Math.abs(mCenter.lat - dLat) > 0.0001) {
+              console.error('[CAMERA DIVERGENCE]', {
+                map: { zoom: mZoom, lng: mCenter.lng, lat: mCenter.lat },
+                deck: { zoom: dZoom, lng: dLng, lat: dLat },
+              });
+            }
+          }
+        }
+      }
+    }
+  }, [deckLayers]);
+
+  // PHASE 3.2 & 3.3: ResizeObserver + Map Health Monitoring
+  useEffect(() => {
+    if (!containerRef.current || !mapRef.current) return;
+
+    const map = mapRef.current.getMap();
+    const resizeObserver = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        const { width, height } = entry.contentRect;
+        // Resize map when container changes
+        if (map) {
+          map.resize();
+        }
+
+        // PHASE 3.2: Update map health for diagnostic notice
+        const canvas = map?.getCanvas();
+        const canvasRect = canvas?.getBoundingClientRect();
+        const style = map?.isStyleLoaded();
+        const visibleLayers = overlayRef.current
+          ? deckLayersRef.current.filter((l: any) => l.props.visible !== false).length
+          : 0;
+
+        setMapHealth({
+          styleLoaded: style ?? false,
+          visibleLayers,
+          canvasOk: !!(canvasRect && canvasRect.width > 10 && canvasRect.height > 10),
+        });
+      }
+    });
+
+    resizeObserver.observe(containerRef.current);
+
+    // Fullscreen handler
+    const handleFullscreen = () => {
+      setTimeout(() => {
+        if (map) map.resize();
+      }, 100);
+    };
+    document.addEventListener('fullscreenchange', handleFullscreen);
+    document.addEventListener('webkitfullscreenchange', handleFullscreen);
+
+    return () => {
+      resizeObserver.disconnect();
+      document.removeEventListener('fullscreenchange', handleFullscreen);
+      document.removeEventListener('webkitfullscreenchange', handleFullscreen);
+    };
   }, [deckLayers]);
 
   // Throttled mouse move
@@ -296,29 +482,68 @@ export const RouteMap = () => {
     }
   }, []);
 
-  // Scale bar calculation (fixed DEFECT 4)
+  // Scale bar calculation (fixed 2.2: proper formula)
   const scaleBar = useMemo(() => {
     const lat = viewState.latitude;
     const z = viewState.zoom;
-    // Earth circumference at equator: 40,075,017m
-    // At latitude: cos(lat) correction
     // meters per pixel: 156,543.03392 * cos(lat) / 2^zoom
-    const metersPerPixel = (40075017 * Math.cos(lat * Math.PI / 180)) / Math.pow(2, z);
-    const targetMeters = metersPerPixel * 100; // ~100px bar
-    const NICE = [1, 2, 5, 10, 25, 50, 100, 250, 500, 1000, 2000, 5000, 10000, 20000];
-    const km = NICE.find((v) => v * 1000 >= targetMeters) ?? 20000;
+    const metersPerPixel = 156543.03392 * Math.cos(lat * Math.PI / 180) / Math.pow(2, z);
+    const targetMeters = metersPerPixel * 100; // aim for ~100px bar
+    const NICE = [1, 2, 5, 10, 25, 50, 100, 250, 500, 1000, 2000, 5000]; // KILOMETRES
+    const km = NICE.find((v) => v * 1000 >= targetMeters) ?? 5000;
     const widthPx = (km * 1000) / metersPerPixel;
     return { text: `${km} km`, width: Math.round(widthPx) };
   }, [viewState]);
 
   const currentStyle = baseLayer === 'satellite' ? satelliteStyle : chartStyle;
 
+  // Determine if map is not drawing
+  const MapNotDrawingNotice = useMemo(() => {
+    if (!import.meta.env.DEV || !mapHealth) return null;
+
+    // visibleLayers is read from the overlay closure and is unreliable (reads 0
+    // when the overlay ref is momentarily null), so it is shown for info only and
+    // no longer gates this blocking notice — canvas + style are the real signals.
+    const isNotDrawing = !mapHealth.canvasOk || !mapHealth.styleLoaded;
+    if (!isNotDrawing) return null;
+
+    return (
+      <div
+        className="absolute inset-0 z-50 flex flex-col items-center justify-center"
+        style={{ background: 'rgba(197, 48, 48, 0.9)' }}
+      >
+        <div
+          className="px-8 py-6 rounded-lg font-mono text-center"
+          style={{ background: '#17161A', border: '2px solid #F26430', color: '#EDE7DC' }}
+        >
+          <h2 style={{ color: '#F26430', marginBottom: 16, fontSize: 24 }}>⚠ MAP NOT DRAWING</h2>
+          <div style={{ fontSize: 14, marginBottom: 12 }}>
+            <div>Canvas OK: {mapHealth.canvasOk ? '✓' : '✗ FAIL'}</div>
+            <div>Style Loaded: {mapHealth.styleLoaded ? '✓' : '✗ FAIL'}</div>
+            <div>Visible Layers: {mapHealth.visibleLayers === 0 ? '✗ 0' : mapHealth.visibleLayers}</div>
+          </div>
+          <button
+            onClick={() => location.reload()}
+            style={{
+              padding: '12px 24px',
+              background: '#2A282F',
+              border: '1px solid #F26430',
+              color: '#F26430',
+              font: '14px monospace',
+              cursor: 'pointer',
+            }}
+          >RELOAD</button>
+        </div>
+      </div>
+    );
+  }, [mapHealth]);
+
   return (
-    <div className="relative w-full h-full" style={{ backgroundColor: COLORS.water }}>
-      {/* MapLibre base map */}
+    <div ref={containerRef} className="relative w-full h-full" style={{ backgroundColor: COLORS.water }}>
+      {/* MapLibre base map - R9: Use initialViewState, NOT controlled viewState */}
       <Map
         ref={mapRef}
-        {...viewState}
+        initialViewState={INITIAL_VIEW}
         mapStyle={currentStyle}
         style={{ width: '100%', height: '100%' }}
         onMouseMove={handleMouseMove}
@@ -327,6 +552,52 @@ export const RouteMap = () => {
         maxZoom={16}
         minZoom={1}
       />
+
+      {/* PHASE 3.3: FIT TO AOI Control */}
+      <button
+        onClick={() => {
+          const map = mapRef.current?.getMap();
+          if (map) {
+            // R9: Dev assertion - warn if programmatic move after user interaction
+            if (import.meta.env.DEV && userHasMovedCamera.current) {
+              console.error('[CAM] programmatic move after user interaction',
+                new Error().stack?.split('\n').slice(1, 4).join(' | '));
+            }
+            // AOI bounds: lng 68-75, lat 15-22
+            map.fitBounds([[68, 15], [75, 22]], { padding: 50, duration: 800 });
+          }
+        }}
+        className="absolute top-4 right-4 z-30 px-3 py-2 rounded font-mono text-[11px] font-medium transition-colors active:scale-95"
+        style={{
+          backgroundColor: 'rgba(197, 80, 48, 0.9)',
+          border: '1px solid rgba(242, 100, 48, 0.5)',
+          color: '#EDE7DC',
+        }}
+        onMouseEnter={(e) => {
+          e.currentTarget.style.backgroundColor = 'rgba(218, 96, 64, 0.95)';
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.backgroundColor = 'rgba(197, 80, 48, 0.9)';
+        }}
+      >
+        FIT TO AOI
+      </button>
+
+      {/* Zoom Slider - Elastic vertical slider */}
+      <div className="absolute top-16 right-4 z-30">
+        <ZoomSlider
+          zoom={zoom}
+          minZoom={1}
+          maxZoom={16}
+          onZoomChange={(newZoom) => {
+            const map = mapRef.current?.getMap();
+            if (map) {
+              map.setZoom(newZoom);
+              setZoom(newZoom);
+            }
+          }}
+        />
+      </div>
 
       {/* SAR Grid Overlay */}
       <div
@@ -407,6 +678,9 @@ export const RouteMap = () => {
       >
         TRACKING {fleetBuffers.count} VESSELS
       </div>
+
+      {/* PHASE 3.2: Map Not Drawing Notice (dev only) */}
+      {MapNotDrawingNotice}
     </div>
   );
 };

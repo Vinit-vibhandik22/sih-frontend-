@@ -9,6 +9,7 @@ import { CommandPalette } from '../components/layout/CommandPalette';
 import { KeyboardShortcuts } from '../components/layout/KeyboardShortcuts';
 import { TimelineProvider } from '../components/timeline/Timeline';
 import { TrafficProvider } from '../traffic/TrafficProvider';
+import { CrashBoundary } from '../app/CrashBoundary';
 import { useUIStore } from '../store/uiSlice';
 
 export const AppConsole = () => {
@@ -35,13 +36,15 @@ export const AppConsole = () => {
   }, [toggleKeyboardShortcuts, toggleCommandPalette]);
 
   return (
-    <TimelineProvider>
-      <TrafficProvider>
-        <ConsoleLayout />
-        <CommandPalette />
-        <KeyboardShortcuts />
-      </TrafficProvider>
-    </TimelineProvider>
+    <CrashBoundary name="AppConsole">
+      <TimelineProvider>
+        <TrafficProvider>
+          <ConsoleLayout />
+          <CommandPalette />
+          <KeyboardShortcuts />
+        </TrafficProvider>
+      </TimelineProvider>
+    </CrashBoundary>
   );
 };
 

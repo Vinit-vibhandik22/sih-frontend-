@@ -3,6 +3,7 @@ import { useEffect, lazy, Suspense } from 'react'
 import { PreviewPage } from './pages/PreviewPage'
 import { LandingPage } from './pages/LandingPage'
 import { AppConsole } from './pages/AppConsole'
+import { CrashBoundary } from './app/CrashBoundary'
 import Lenis from 'lenis'
 
 // Lazy load Landing2 for code splitting
@@ -45,35 +46,37 @@ function SmoothScroll({ children, enabled = true }: { children: React.ReactNode;
 
 function App() {
   return (
-    <BrowserRouter>
-      <Routes>
-        {/* Landing page (Landing2Page) - scroll-tied video */}
-        <Route
-          path="/"
-          element={
-            <Suspense fallback={<div className="h-screen w-full bg-[#05080F]" />}>
-              <Landing2Page />
-            </Suspense>
-          }
-        />
+    <CrashBoundary name="App.Root">
+      <BrowserRouter>
+        <Routes>
+          {/* Landing page (Landing2Page) - scroll-tied video */}
+          <Route
+            path="/"
+            element={
+              <Suspense fallback={<div className="h-screen w-full bg-[#05080F]" />}>
+                <Landing2Page />
+              </Suspense>
+            }
+          />
 
-        {/* Original landing page - now at /landing-classic */}
-        <Route
-          path="/landing-classic"
-          element={
-            <SmoothScroll enabled>
-              <LandingPage />
-            </SmoothScroll>
-          }
-        />
+          {/* Original landing page - now at /landing-classic */}
+          <Route
+            path="/landing-classic"
+            element={
+              <SmoothScroll enabled>
+                <LandingPage />
+              </SmoothScroll>
+            }
+          />
 
-        {/* App console routes (no smooth scroll) */}
-        <Route path="/app/*" element={<AppConsole />} />
+          {/* App console routes (no smooth scroll) */}
+          <Route path="/app/*" element={<AppConsole />} />
 
-        {/* Preview page */}
-        <Route path="/preview" element={<PreviewPage />} />
-      </Routes>
-    </BrowserRouter>
+          {/* Preview page */}
+          <Route path="/preview" element={<PreviewPage />} />
+        </Routes>
+      </BrowserRouter>
+    </CrashBoundary>
   )
 }
 

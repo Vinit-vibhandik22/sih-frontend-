@@ -10,4 +10,11 @@ export default defineConfig({
       '@': path.resolve(__dirname, './src'),
     },
   },
+  build: {
+    sourcemap: true,
+  },
+  // For production debugging - preserve class names
+  esbuild: {
+    keepNames: true,
+  },
 })

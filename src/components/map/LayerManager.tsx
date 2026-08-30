@@ -42,7 +42,7 @@ const defaultLayers: Layer[] = [
     visible: true,
     opacity: 100,
     children: [
-      { id: 'ocean', name: 'Ocean (OpenFreeMap)', icon: <Layers className="w-4 h-4" />, visible: true, opacity: 100 },
+      { id: 'ocean', name: 'Chart', icon: <Layers className="w-4 h-4" />, visible: true, opacity: 100 },
       { id: 'satellite', name: 'Satellite (Esri)', icon: <Globe className="w-4 h-4" />, visible: false, opacity: 100 },
     ],
   },
@@ -142,7 +142,7 @@ export const LayerManager = () => {
   const toggleVisibility = (layerId: string) => {
     // Handle base layer switching: only one of ocean/satellite visible at a time
     if (layerId === 'ocean' || layerId === 'satellite') {
-      const newStyle = layerId === 'ocean' ? 'ocean' : 'satellite';
+      const newStyle = layerId === 'ocean' ? 'chart' : 'satellite';
       // Dispatch custom event for RouteMap to pick up
       window.dispatchEvent(new CustomEvent('map-style-change', { detail: newStyle }));
       // Update layer store base layer

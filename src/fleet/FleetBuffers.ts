@@ -82,6 +82,12 @@ export class FleetBuffers {
   names: string[] = [];
   index = new Map<string, number>();
 
+  // R9: lastSeen timestamps for liveness tracking (ms since epoch)
+  lastSeen = new Float64Array(CAPACITY);
+
+  // R9: synthetic flag - vessels that are part of scenario seed
+  isSynthetic = new Uint8Array(CAPACITY);
+
   // Selection
   selectedIdx = -1;
   suspectIdx = -1;
@@ -99,41 +105,52 @@ export class FleetBuffers {
    */
   upsert(p: PositionUpdate) {
     let i = this.index.get(p.mmsi);
-    if (i === undefined) {
+    const isNew = i === undefined;
+    if (isNew) {
       i = this.count++;
       this.index.set(p.mmsi, i);
       this.mmsi[i] = p.mmsi;
       this.names[i] = p.name;
+      // R9: Mark synthetic vessels (scenario seed) as exempt from reaper
+      if (p.origin === 'sim') {
+        this.isSynthetic[i] = 1;
+      }
     }
 
+    // At this point i is guaranteed to be a valid index
+    const idx = i!;
+
     // Position - LNG FIRST
-    this.positions[i * 2] = p.lng;
-    this.positions[i * 2 + 1] = p.lat;
+    this.positions[idx * 2] = p.lng;
+    this.positions[idx * 2 + 1] = p.lat;
 
     // Angle
-    this.angles[i] = p.cog;
+    this.angles[idx] = p.cog;
 
     // Type code and color
-    this.typeCode[i] = p.type;
+    this.typeCode[idx] = p.type;
     const tc = TYPE_COLORS[p.type] ?? TYPE_COLORS[VESSEL_TYPES.OTHER];
-    this.colors[i * 4] = tc[0];
-    this.colors[i * 4 + 1] = tc[1];
-    this.colors[i * 4 + 2] = tc[2];
+    this.colors[idx * 4] = tc[0];
+    this.colors[idx * 4 + 1] = tc[1];
+    this.colors[idx * 4 + 2] = tc[2];
 
     // Filter values
-    this.filterVals[i * 2] = p.sog;
+    this.filterVals[idx * 2] = p.sog;
     // Gap in minutes - compute from timestamp if available
-    this.filterVals[i * 2 + 1] = 0; // Updated by caller if known
+    this.filterVals[idx * 2 + 1] = 0; // Updated by caller if known
+
+    // R9: Update lastSeen timestamp
+    this.lastSeen[idx] = Date.now();
 
     // Trail ring buffer write
-    const h = this.trailHead[i];
-    const slotBase = (i * TRAIL_SLOTS + h) * 2;
+    const h = this.trailHead[idx];
+    const slotBase = (idx * TRAIL_SLOTS + h) * 2;
     this.trailXY[slotBase] = p.lng;     // lng
     this.trailXY[slotBase + 1] = p.lat; // lat
 
-    this.trailHead[i] = (h + 1) % TRAIL_SLOTS;
-    if (this.trailLen[i] < TRAIL_SLOTS) {
-      this.trailLen[i]++;
+    this.trailHead[idx] = (h + 1) % TRAIL_SLOTS;
+    if (this.trailLen[idx] < TRAIL_SLOTS) {
+      this.trailLen[idx]++;
     }
   }
 
