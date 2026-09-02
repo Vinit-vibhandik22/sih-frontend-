@@ -15,6 +15,16 @@ import type {
 
 import { mockSpill, mockDriftHindcast, mockDriftForecast, mockOrigin, mockVessels, mockAisTracks, mockSuspects } from '@/mock/spills';
 
+import {
+  DEFAULT_SIM_CONFIG,
+  OIL_TYPES,
+  SIM_SCENARIOS,
+  applyScenario,
+  type OilType,
+  type SimConfig,
+  type SimScenario,
+} from '../sim/opendrift/config';
+
 // Delay helper for realistic async behavior
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
@@ -103,6 +113,27 @@ export async function getSuspects(spillId: string): Promise<SuspectScore[]> {
   await delay(500);
   // Filter to suspects with evidence for this spill
   return mockSuspects.filter(() => mockSpill.id === spillId).sort((a, b) => a.rank - b.rank);
+}
+
+// Simulation mode catalogue.
+// The trajectory itself is computed in the browser by src/sim/opendrift, so
+// there is nothing to fetch for a run — only the presets an operator picks
+// from. These stay async so a real backend can serve the catalogue later
+// without touching the panel.
+export async function getSimulationScenarios(): Promise<SimScenario[]> {
+  await delay(80);
+  return SIM_SCENARIOS;
+}
+
+export async function getSimulationOilTypes(): Promise<OilType[]> {
+  await delay(80);
+  return OIL_TYPES;
+}
+
+/** Resolve a scenario preset into the config the engine runs. */
+export async function getSimulationConfig(scenarioId?: string): Promise<SimConfig> {
+  await delay(80);
+  return scenarioId ? applyScenario(DEFAULT_SIM_CONFIG, scenarioId) : DEFAULT_SIM_CONFIG;
 }
 
 // Server-sent event simulation for live updates

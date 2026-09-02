@@ -4,7 +4,8 @@
  */
 
 import { useEffect, useState } from 'react';
-import { Command, User, HelpCircle, Radio } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { Command, User, HelpCircle, Radio, Waves } from 'lucide-react';
 import { useUIStore } from '../../store/uiSlice';
 
 export const TelemetryBar = () => {
@@ -72,6 +73,17 @@ export const TelemetryBar = () => {
 
       {/* Right: Actions */}
       <div className="flex items-center gap-3">
+        <Link
+          to="/simulation"
+          className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-sheen/10 border border-sheen/40 hover:border-sheen hover:bg-sheen/20 transition-colors"
+          title="Enter simulation mode"
+        >
+          <Waves className="w-3.5 h-3.5 text-sheen" strokeWidth={1.5} />
+          <span className="hidden sm:block font-mono text-[10px] uppercase tracking-widest text-sheen">
+            Simulate
+          </span>
+        </Link>
+
         <kbd
           onClick={toggleKeyboardShortcuts}
           className="hidden sm:flex items-center gap-1.5 px-2 py-1 bg-steel/20 border border-steel/50 rounded text-[10px] text-mute hover:border-signal hover:text-signal transition-colors cursor-pointer"

@@ -9,6 +9,10 @@ import Lenis from 'lenis'
 // Lazy load Landing2 for code splitting
 const Landing2Page = lazy(() => import('./pages/Landing2Page'))
 
+// Simulation mode pulls in the OpenDrift engine and its own deck.gl layers, so
+// it stays out of the console bundle until someone actually enters it.
+const SimulationPage = lazy(() => import('./pages/SimulationPage'))
+
 // Smooth scroll wrapper (only for landing page)
 function SmoothScroll({ children, enabled = true }: { children: React.ReactNode; enabled?: boolean }) {
   const location = useLocation();
@@ -71,6 +75,18 @@ function App() {
 
           {/* App console routes (no smooth scroll) */}
           <Route path="/app/*" element={<AppConsole />} />
+
+          {/* Simulation mode - synthetic OpenDrift run, separate from case analysis */}
+          <Route
+            path="/simulation"
+            element={
+              <CrashBoundary name="App.Simulation">
+                <Suspense fallback={<div className="h-screen w-full bg-[#05080F]" />}>
+                  <SimulationPage />
+                </Suspense>
+              </CrashBoundary>
+            }
+          />
 
           {/* Preview page */}
           <Route path="/preview" element={<PreviewPage />} />

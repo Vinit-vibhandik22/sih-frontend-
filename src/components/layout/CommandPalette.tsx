@@ -5,7 +5,7 @@
 
 import { useEffect, useState, useMemo, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Command, Layout, Layers, PanelLeftClose, PanelRightClose, HelpCircle, X } from 'lucide-react';
+import { Command, Layout, Layers, PanelLeftClose, PanelRightClose, HelpCircle, X, Waves } from 'lucide-react';
 import { useUIStore } from '../../store/uiSlice';
 
 interface CommandItem {
@@ -62,6 +62,15 @@ export const CommandPalette = () => {
       icon: <Layout className="w-4 h-4" />,
       shortcut: 'G C',
       action: () => { window.location.href = '/app/cases'; },
+      category: 'Navigation',
+    },
+    {
+      id: 'nav-simulation',
+      label: 'Enter Simulation Mode',
+      description: 'Run an OpenDrift oil drift simulation on synthetic forcing',
+      icon: <Waves className="w-4 h-4" />,
+      shortcut: 'G S',
+      action: () => { window.location.href = '/simulation'; },
       category: 'Navigation',
     },
 
