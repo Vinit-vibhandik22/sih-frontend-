@@ -4,6 +4,8 @@ import { PreviewPage } from './pages/PreviewPage'
 import { LandingPage } from './pages/LandingPage'
 import { AppConsole } from './pages/AppConsole'
 import { CrashBoundary } from './app/CrashBoundary'
+import { PageLoader } from './components/ui'
+import { SimulationSkeleton } from './components/simulation/SimulationSkeleton'
 import Lenis from 'lenis'
 
 // Lazy load Landing2 for code splitting
@@ -57,7 +59,7 @@ function App() {
           <Route
             path="/"
             element={
-              <Suspense fallback={<div className="h-screen w-full bg-[#05080F]" />}>
+              <Suspense fallback={<PageLoader />}>
                 <Landing2Page />
               </Suspense>
             }
@@ -81,7 +83,7 @@ function App() {
             path="/simulation"
             element={
               <CrashBoundary name="App.Simulation">
-                <Suspense fallback={<div className="h-screen w-full bg-[#05080F]" />}>
+                <Suspense fallback={<SimulationSkeleton />}>
                   <SimulationPage />
                 </Suspense>
               </CrashBoundary>

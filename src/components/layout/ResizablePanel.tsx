@@ -1,6 +1,14 @@
 /**
  * ResizablePanel.tsx
  * Generic draggable resizable sidebar/bottom panel with collapse toggle.
+ *
+ * Below the `lg` breakpoint a left/right panel stops competing for row width
+ * and becomes an overlay drawer, closed by default. Two 200px-minimum sidebars
+ * on a 320px screen left the map with no room at all, and every consumer of
+ * this component had the same problem, so the fix lives here rather than in
+ * each layout. The drawer's open state is deliberately local: the store is
+ * persisted, and writing a phone-sized collapse into it would follow the user
+ * back to their desktop.
  */
 
 import { useState, useRef, MouseEvent as ReactMouseEvent, useEffect } from 'react';
@@ -15,6 +23,25 @@ interface ResizablePanelProps {
   tabs?: Array<{ id: string; label: string }>;
 }
 
+/** True below Tailwind's `lg` breakpoint, kept in sync with the CSS media query. */
+function useIsNarrow(): boolean {
+  const query = '(max-width: 1023px)';
+  // Read synchronously so the first paint already uses the right layout.
+  const [narrow, setNarrow] = useState(
+    () => typeof window !== 'undefined' && window.matchMedia(query).matches,
+  );
+
+  useEffect(() => {
+    const mql = window.matchMedia(query);
+    const onChange = () => setNarrow(mql.matches);
+    onChange();
+    mql.addEventListener('change', onChange);
+    return () => mql.removeEventListener('change', onChange);
+  }, []);
+
+  return narrow;
+}
+
 export const ResizablePanel = ({ side, children, title, tabs }: ResizablePanelProps) => {
   const { panels, setPanelCollapsed, setPanelSize, setPanelTab } = useUIStore();
   const panel = panels[side];
@@ -24,6 +51,12 @@ export const ResizablePanel = ({ side, children, title, tabs }: ResizablePanelPr
   const isHorizontal = side === 'left' || side === 'right';
   const panelSize = isHorizontal ? panel.width ?? panel.size : panel.height ?? panel.size;
   const [localSize, setLocalSize] = useState(panel.collapsed ? 0 : (panelSize ?? 300));
+
+  // Drawer mode: narrow viewport, side panel. The bottom panel already docks to
+  // a height that works on a phone, so it keeps its normal behaviour.
+  const isDrawer = useIsNarrow() && isHorizontal;
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const collapsed = isDrawer ? !drawerOpen : panel.collapsed;
 
   const handleMouseDown = (e: ReactMouseEvent) => {
     e.preventDefault();
@@ -58,6 +91,10 @@ export const ResizablePanel = ({ side, children, title, tabs }: ResizablePanelPr
   };
 
   const handleToggleCollapse = () => {
+    if (isDrawer) {
+      setDrawerOpen((open) => !open);
+      return;
+    }
     setPanelCollapsed(side, !panel.collapsed);
   };
 
@@ -74,119 +111,163 @@ export const ResizablePanel = ({ side, children, title, tabs }: ResizablePanelPr
   }, [panel.width, panel.height, panel.collapsed, isResizing, isHorizontal]);
 
   const sizeStyle = isHorizontal
-    ? { width: panel.collapsed ? 0 : localSize, minWidth: panel.collapsed ? 0 : 200, maxWidth: panel.collapsed ? 0 : 600 }
-    : { height: panel.collapsed ? 0 : localSize, minHeight: panel.collapsed ? 0 : 120, maxHeight: panel.collapsed ? 0 : 400 };
+    ? { width: collapsed ? 0 : localSize, minWidth: collapsed ? 0 : 200, maxWidth: collapsed ? 0 : 600 }
+    : { height: collapsed ? 0 : localSize, minHeight: collapsed ? 0 : 120, maxHeight: collapsed ? 0 : 400 };
+
+  // A drawer is sized by its classes, not by the drag-resize width, so the
+  // inline style has to stay out of the way entirely.
+  const style = isDrawer ? undefined : collapsed ? { overflow: 'visible' as const } : sizeStyle;
+
+  // Edge tab that reopens a closed drawer. On desktop this job belongs to the
+  // host layout's own expander, which reads the store; the drawer's state is
+  // local, so it carries its own control.
+  if (isDrawer && !drawerOpen) {
+    return (
+      <button
+        onClick={() => setDrawerOpen(true)}
+        className={`
+          absolute top-1/2 z-30 -translate-y-1/2 h-14 w-6
+          bg-deep border border-steel/50 text-mute
+          flex items-center justify-center
+          hover:border-signal hover:text-signal transition-colors
+          ${side === 'left' ? 'left-0 rounded-r border-l-0' : 'right-0 rounded-l border-r-0'}
+        `}
+        aria-label={`Open ${title} panel`}
+        title={`Open ${title}`}
+      >
+        {side === 'left' ? <ChevronRight className="w-3 h-3" /> : <ChevronLeft className="w-3 h-3" />}
+      </button>
+    );
+  }
 
   return (
-    <motion.div
-      ref={panelRef}
-      initial={{ opacity: 0 }}
-      animate={{ opacity: panel.collapsed ? 0 : 1 }}
-      className={`
-        relative bg-deep border border-steel/50
-        ${isHorizontal
-          ? side === 'left'
-            ? 'border-r'
-            : 'border-l'
-          : 'border-t'
-        }
-        ${panel.collapsed && isHorizontal ? 'w-0 min-w-0 overflow-visible' : ''}
-      `}
-      style={panel.collapsed ? { overflow: 'visible' } : sizeStyle}
-    >
-      {/* Collapse Handle (visible when expanded) */}
-      {!panel.collapsed && side !== 'bottom' && (
-        <button
-          onClick={handleToggleCollapse}
-          className={`
-            absolute -translate-y-1/2 z-10 w-6 h-12
-            bg-deep border border-steel/50 rounded
-            flex items-center justify-center
-            hover:border-signal hover:text-signal
-            transition-colors
-            ${side === 'left' ? '-right-3' : '-left-3'}
-          `}
-          title={side === 'left' ? 'Collapse left panel' : 'Collapse right panel'}
-        >
-          {side === 'left' ? <ChevronLeft className="w-3 h-3" /> : <ChevronLeft className="w-3 h-3 rotate-180" />}
-        </button>
-      )}
-
-      {/* Resizer handle */}
-      {!panel.collapsed && (
+    <>
+      {/* Tapping the chart closes the drawer — the usual way out of a phone
+          overlay, and the only one that does not need the header. */}
+      {isDrawer && drawerOpen && (
         <div
-          onMouseDown={handleMouseDown}
-          className={`
-            absolute z-10 hover:bg-signal/20 cursor-col-resize
-            ${isHorizontal
-              ? side === 'left'
-                ? 'right-0 top-0 bottom-0 w-1 hover:w-2 transition-all'
-                : 'left-0 top-0 bottom-0 w-1 hover:w-2 transition-all'
-              : 'top-0 left-0 right-0 h-1 hover:h-2 cursor-row-resize'
-            }
-            ${isResizing ? 'bg-signal/40' : ''}
-          `}
+          onClick={() => setDrawerOpen(false)}
+          className="absolute inset-0 z-30 bg-abyss/60"
+          aria-hidden="true"
         />
       )}
 
-      {/* Collapse Button for Bottom Panel */}
-      {!panel.collapsed && side === 'bottom' && (
-        <button
-          onClick={handleToggleCollapse}
-          className="absolute right-2 top-2 z-10 p-1 hover:bg-steel/20 rounded transition-colors"
-        >
-          <X className="w-3 h-3 text-mute" />
-        </button>
-      )}
-
-      {/* Panel Content */}
-      <AnimatePresence>
-        {!panel.collapsed && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="h-full flex flex-col"
+      <motion.div
+        ref={panelRef}
+        initial={{ opacity: 0 }}
+        animate={{ opacity: collapsed ? 0 : 1 }}
+        className={`
+          bg-deep border border-steel/50
+          ${isDrawer
+            ? `absolute inset-y-0 z-40 w-[85vw] max-w-[320px] shadow-2xl ${side === 'left' ? 'left-0' : 'right-0'}`
+            : 'relative'
+          }
+          ${isHorizontal
+            ? side === 'left'
+              ? 'border-r'
+              : 'border-l'
+            : 'border-t'
+          }
+          ${collapsed && isHorizontal && !isDrawer ? 'w-0 min-w-0 overflow-visible' : ''}
+        `}
+        style={style}
+      >
+        {/* Collapse Handle (visible when expanded) */}
+        {!collapsed && side !== 'bottom' && (
+          <button
+            onClick={handleToggleCollapse}
+            className={`
+              absolute top-1/2 -translate-y-1/2 z-10 w-6 h-12
+              bg-deep border border-steel/50 rounded
+              flex items-center justify-center
+              hover:border-signal hover:text-signal
+              transition-colors
+              ${side === 'left' ? '-right-3' : '-left-3'}
+            `}
+            aria-label={side === 'left' ? 'Collapse left panel' : 'Collapse right panel'}
+            title={side === 'left' ? 'Collapse left panel' : 'Collapse right panel'}
           >
-            {/* Panel Header */}
-            <div className="flex items-center justify-between px-4 py-3 border-b border-steel/50 shrink-0">
-              <h2 className="font-mono text-xs text-ice font-medium tracking-widest uppercase">
-                {title}
-              </h2>
-              <button className="p-1 hover:bg-steel/20 rounded transition-colors">
-                <MoreHorizontal className="w-3 h-3 text-mute" />
-              </button>
-            </div>
-
-            {/* Tabs */}
-            {tabs && tabs.length > 0 && (
-              <div className="flex border-b border-steel/50 shrink-0">
-                {tabs.map((tab) => (
-                  <button
-                    key={tab.id}
-                    onClick={() => handleTabClick(tab.id)}
-                    className={`
-                      px-4 py-2 font-mono text-[10px] text-xs transition-colors border-b-2
-                      ${panel.tab === tab.id
-                        ? 'text-signal border-signal bg-signal/5'
-                        : 'text-mute border-transparent hover:text-mute-dim hover:border-steel/50'
-                      }
-                    `}
-                  >
-                    {tab.label}
-                  </button>
-                ))}
-              </div>
-            )}
-
-            {/* Panel Body */}
-            <div className="flex-1 overflow-auto">
-              {children}
-            </div>
-          </motion.div>
+            {side === 'left' ? <ChevronLeft className="w-3 h-3" /> : <ChevronLeft className="w-3 h-3 rotate-180" />}
+          </button>
         )}
-      </AnimatePresence>
-    </motion.div>
+
+        {/* Resizer handle — pointless on a fixed-width drawer. */}
+        {!collapsed && !isDrawer && (
+          <div
+            onMouseDown={handleMouseDown}
+            className={`
+              absolute z-10 hover:bg-signal/20 cursor-col-resize
+              ${isHorizontal
+                ? side === 'left'
+                  ? 'right-0 top-0 bottom-0 w-1 hover:w-2 transition-all'
+                  : 'left-0 top-0 bottom-0 w-1 hover:w-2 transition-all'
+                : 'top-0 left-0 right-0 h-1 hover:h-2 cursor-row-resize'
+              }
+              ${isResizing ? 'bg-signal/40' : ''}
+            `}
+          />
+        )}
+
+        {/* Collapse Button for Bottom Panel */}
+        {!collapsed && side === 'bottom' && (
+          <button
+            onClick={handleToggleCollapse}
+            className="absolute right-2 top-2 z-10 p-1 hover:bg-steel/20 rounded transition-colors"
+            aria-label="Collapse bottom panel"
+          >
+            <X className="w-3 h-3 text-mute" />
+          </button>
+        )}
+
+        {/* Panel Content */}
+        <AnimatePresence>
+          {!collapsed && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="h-full flex flex-col"
+            >
+              {/* Panel Header */}
+              <div className="flex items-center justify-between px-4 py-3 border-b border-steel/50 shrink-0">
+                <h2 className="font-mono text-xs text-ice font-medium tracking-widest uppercase">
+                  {title}
+                </h2>
+                <button className="p-1 hover:bg-steel/20 rounded transition-colors" aria-label="Panel options">
+                  <MoreHorizontal className="w-3 h-3 text-mute" />
+                </button>
+              </div>
+
+              {/* Tabs */}
+              {tabs && tabs.length > 0 && (
+                <div className="flex border-b border-steel/50 shrink-0 overflow-x-auto">
+                  {tabs.map((tab) => (
+                    <button
+                      key={tab.id}
+                      onClick={() => handleTabClick(tab.id)}
+                      className={`
+                        shrink-0 px-4 py-2 font-mono text-[10px] transition-colors border-b-2
+                        ${panel.tab === tab.id
+                          ? 'text-signal border-signal bg-signal/5'
+                          : 'text-mute border-transparent hover:text-mute-dim hover:border-steel/50'
+                        }
+                      `}
+                    >
+                      {tab.label}
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {/* Panel Body */}
+              <div className="flex-1 overflow-auto">
+                {children}
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </motion.div>
+    </>
   );
 };
 

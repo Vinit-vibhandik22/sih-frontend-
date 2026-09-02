@@ -15,41 +15,67 @@
   <body>
     <div id="root">
       <!-- PHASE 1: Boot fallback - visible if React fails to mount -->
-      <div id="boot-fallback" style="
+      <div id="boot-fallback" role="status" aria-live="polite" style="
         position: fixed;
         inset: 0;
-        background: #201F24;
+        background: #17161A;
         color: #EDE7DC;
-        font: 14px 'JetBrains Mono', monospace;
+        font: 14px 'IBM Plex Mono', 'JetBrains Mono', monospace;
         display: flex;
         flex-direction: column;
         align-items: center;
         justify-content: center;
         gap: 16px;
+        padding: 24px;
+        text-align: center;
         z-index: 99999;
       ">
-        <div style="height: 4px; width: 200px; background: #4FA88B; animation: pulse 1.5s ease-in-out infinite;"></div>
+        <div style="height: 4px; width: 200px; max-width: 60vw; background: #4FA88B; animation: boot-pulse 1.5s ease-in-out infinite;"></div>
         <div style="font-size: 18px; color: #4FA88B;">BOOTING CONSOLE…</div>
-        <div id="boot-error" style="color: #97918A; font-size: 12px; display: none;"></div>
+        <div id="boot-error" style="color: #97918A; font-size: 12px; display: none; max-width: 44ch; line-height: 1.5;"></div>
         <style>
-          @keyframes pulse {
+          @keyframes boot-pulse {
             0%, 100% { opacity: 1; }
             50% { opacity: 0.3; }
+          }
+          @media (prefers-reduced-motion: reduce) {
+            #boot-fallback [style*="boot-pulse"] { animation: none !important; }
           }
         </style>
       </div>
     </div>
     <script type="module" src="/src/main.tsx"></script>
-    <!-- Boot timeout - if React doesn't mount in 5s, show warning -->
+    <!--
+      Two-stage boot notice. The dev server transforms the module graph on
+      demand, so a cold first load legitimately runs past five seconds — the
+      old single timeout reported that healthy wait as a crash. Stage one
+      explains the wait; stage two only fires long after any healthy boot and
+      reports whether the entry module ever executed (window.__bootModuleRan,
+      set at the top of src/main.tsx) so the message points at the real fault.
+      Both stages no-op once React has removed the fallback.
+    -->
     <script>
-      setTimeout(function() {
-        const fallback = document.getElementById('boot-fallback');
-        const errorDiv = document.getElementById('boot-error');
-        if (fallback && fallback.parentNode) {
-          errorDiv.textContent = 'BOOT TIMEOUT (React may have crashed - check console)';
-          errorDiv.style.display = 'block';
+      (function () {
+        function say(text, color) {
+          var fallback = document.getElementById('boot-fallback');
+          var note = document.getElementById('boot-error');
+          if (!fallback || !fallback.parentNode || !note) return;
+          note.textContent = text;
+          note.style.color = color;
+          note.style.display = 'block';
         }
-      }, 5000);
+        setTimeout(function () {
+          say('FIRST LOAD — COMPILING MODULES, THIS CAN TAKE A MOMENT', '#97918A');
+        }, 4000);
+        setTimeout(function () {
+          say(
+            window.__bootModuleRan
+              ? 'BOOT STALLED AFTER THE BUNDLE LOADED — CHECK THE CONSOLE'
+              : 'BOOT STALLED WHILE LOADING THE BUNDLE — CHECK THE CONSOLE AND NETWORK TAB',
+            '#F26430'
+          );
+        }, 20000);
+      })();
     </script>
   </body>
 </html>

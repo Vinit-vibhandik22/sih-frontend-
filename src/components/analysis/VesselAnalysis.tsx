@@ -6,8 +6,9 @@
 import { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Ship, AlertTriangle, Activity, Eye, Search, Filter } from 'lucide-react';
-import { useFleetStore, getVesselList } from '../../store/fleetStore';
-import { mockSuspects, mockVessels } from '../../mock/spills';
+import { useShallow } from 'zustand/react/shallow';
+import { useFleetStore } from '../../store/fleetStore';
+import { mockSuspects } from '../../mock/spills';
 
 interface VesselCardProps {
   mmsi: string;
@@ -139,7 +140,10 @@ const VesselCard = ({
 };
 
 export const VesselAnalysis = () => {
-  const vessels = useFleetStore((s) => Object.values(s.vessels));
+  // `useShallow` is required, not decorative: `Object.values` allocates a new
+  // array on every read, and zustand compares snapshots by reference, so the
+  // bare selector re-rendered forever ("Maximum update depth exceeded").
+  const vessels = useFleetStore(useShallow((s) => Object.values(s.vessels)));
   const [expandedVessel, setExpandedVessel] = useState<string | null>(null);
   const [showSuspectsOnly, setShowSuspectsOnly] = useState(false);
   const [minScore, setMinScore] = useState(0);

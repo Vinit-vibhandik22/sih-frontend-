@@ -11,7 +11,7 @@
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowLeft, Waves } from 'lucide-react';
-import { Badge, Panel, Switch, Telemetry, ToggleGroup } from '../components/ui';
+import { Badge, Panel, Spinner, Switch, Telemetry, ToggleGroup } from '../components/ui';
 import { CrashBoundary } from '../app/CrashBoundary';
 import { OilBudgetChart } from '../components/simulation/OilBudgetChart';
 import { SimulationControls } from '../components/simulation/SimulationControls';
@@ -38,6 +38,16 @@ export function SimulationPage() {
   const { config, frame, stats, phase } = run;
   const oil = getOilType(config.oilTypeId);
 
+  // The map is empty until the coastline is in and the engine has produced its
+  // first frame, so both waits get the same explicit overlay instead of a
+  // blank chart.
+  const waitingFor =
+    phase === 'loading'
+      ? 'Loading coastline raster'
+      : phase === 'computing' && run.frameCount === 0
+        ? 'Seeding elements and integrating the first step'
+        : null;
+
   // Sample the forcing at the release point for the displayed instant, so the
   // environment readout is the field the engine used, not the configured mean.
   const env = useMemo(() => {
@@ -49,31 +59,35 @@ export function SimulationPage() {
 
   return (
     <div className="flex h-screen w-full flex-col overflow-hidden bg-abyss">
-      <header className="flex h-14 shrink-0 items-center gap-4 border-b border-steel/50 bg-abyss px-4">
+      <header className="flex h-14 shrink-0 items-center gap-3 border-b border-steel/50 bg-abyss px-3 sm:gap-4 sm:px-4">
         <Link
           to="/app"
-          className="flex items-center gap-1.5 text-mute transition-colors hover:text-signal"
+          className="flex shrink-0 items-center gap-1.5 text-mute transition-colors hover:text-signal"
           aria-label="Exit simulation mode"
         >
           <ArrowLeft size={14} />
           <span className="font-mono text-[10px] uppercase tracking-widest">Exit</span>
         </Link>
 
-        <div className="flex items-center gap-2 border-l border-steel/50 pl-4">
-          <Waves size={15} className="text-signal" />
-          <div className="leading-tight">
-            <div className="font-mono text-xs uppercase tracking-widest text-ice">
+        <div className="flex min-w-0 items-center gap-2 border-l border-steel/50 pl-3 sm:pl-4">
+          <Waves size={15} className="shrink-0 text-signal" />
+          <div className="min-w-0 leading-tight">
+            <div className="truncate font-mono text-xs uppercase tracking-widest text-ice">
               Simulation Mode
             </div>
-            <div className="text-[9px] uppercase tracking-wider text-mute-dim">
+            <div className="hidden text-[9px] uppercase tracking-wider text-mute-dim sm:block">
               OpenDrift OpenOil · synthetic forcing
             </div>
           </div>
         </div>
 
-        <Badge variant="sheen">{oil.name}</Badge>
+        <div className="hidden shrink-0 sm:block">
+          <Badge variant="sheen">{oil.name}</Badge>
+        </div>
 
-        <div className="ml-auto flex items-center gap-5">
+        {/* Readouts fold away on narrow screens — the right panel carries the
+            same numbers, and a squeezed telemetry row overflowed the header. */}
+        <div className="ml-auto hidden shrink-0 items-center gap-5 lg:flex">
           <Telemetry label="Active" value={stats?.active ?? 0} size="sm" variant="signal" />
           <Telemetry label="Submerged" value={stats?.submerged ?? 0} size="sm" />
           <Telemetry label="Stranded" value={stats?.stranded ?? 0} size="sm" variant="amber" />
@@ -86,7 +100,8 @@ export function SimulationPage() {
         </div>
       </header>
 
-      <div className="flex min-h-0 flex-1">
+      {/* `relative` anchors the panels' narrow-width drawer overlay. */}
+      <div className="relative flex min-h-0 flex-1">
         <ResizablePanel side="left" title="Run Config">
           <SimulationSetup active={config} onRun={run.start} busy={phase === 'computing'} />
         </ResizablePanel>
@@ -105,9 +120,19 @@ export function SimulationPage() {
               />
             </CrashBoundary>
 
-            {phase === 'loading' && (
-              <div className="absolute inset-0 flex items-center justify-center bg-abyss/70 font-mono text-[11px] uppercase tracking-widest text-mute">
-                Loading coastline…
+            {waitingFor && (
+              <div
+                role="status"
+                aria-busy="true"
+                className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-abyss/80 px-6 text-center"
+              >
+                <Spinner size="lg" variant="signal" />
+                <div className="font-mono text-[11px] uppercase tracking-[0.3em] text-signal">
+                  Acquiring scene
+                </div>
+                <div className="font-mono text-[10px] uppercase tracking-widest text-mute-dim">
+                  {waitingFor}
+                </div>
               </div>
             )}
             {phase === 'error' && (

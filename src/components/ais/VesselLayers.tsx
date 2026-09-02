@@ -5,6 +5,7 @@
  */
 
 import { useMemo } from 'react';
+import { useShallow } from 'zustand/react/shallow';
 import { useFleetStore } from '../../store/fleetStore';
 
 interface VesselTooltipProps {
@@ -40,7 +41,9 @@ interface VesselLayersProps {
 }
 
 export const VesselLayers = ({ onVesselSelect }: VesselLayersProps) => {
-  const vessels = useFleetStore((state) => Object.values(state.vessels));
+  // Shallow-compared: a bare `Object.values` selector returns a fresh array
+  // every read and loops React's snapshot check. See VesselAnalysis.
+  const vessels = useFleetStore(useShallow((state) => Object.values(state.vessels)));
   const selectedMmsi = useFleetStore((state) => state.selectedMmsi);
   const setSelectedMmsi = useFleetStore((state) => state.setSelectedMmsi);
 

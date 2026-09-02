@@ -3,6 +3,11 @@ import { createRoot } from 'react-dom/client';
 import './styles/tokens.css';
 import App from './App.tsx';
 
+// Imports are hoisted, so reaching this line means the whole module graph
+// resolved and executed. index.html's boot notice reads the flag to tell a slow
+// bundle apart from a bundle that loaded but never rendered.
+(window as unknown as { __bootModuleRan?: boolean }).__bootModuleRan = true;
+
 // PHASE 1: Global error handlers (outside React)
 window.addEventListener('error', (e) => {
   console.error('[GLOBAL ERROR]', {
@@ -150,6 +155,8 @@ createRoot(document.getElementById('root')!).render(
   </StrictMode>,
 );
 
-// Signal boot completion
-removeBootFallback();
+// render() schedules the first commit rather than performing it, so the removal
+// waits a frame. Removing it synchronously flashed an empty page between the
+// fallback going away and React's first paint.
+requestAnimationFrame(removeBootFallback);
 console.log('[BOOT] Application initialized');

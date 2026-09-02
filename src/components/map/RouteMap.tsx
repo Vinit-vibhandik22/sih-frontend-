@@ -86,6 +86,11 @@ export const RouteMap = () => {
   }>(INITIAL_VIEW);
   const [cursorCoords, setCursorCoords] = useState<{ lat: number; lng: number } | null>(null);
   const [isLoaded, setIsLoaded] = useState(false);
+  // Set from <Map onLoad>. The deck overlay init below used to depend on
+  // `[mapRef.current]`: a ref never triggers a render, so once the ref was
+  // non-null at first commit the dep could not change again and the overlay was
+  // never created — a black map with live chrome. State is what re-runs effects.
+  const [mapReady, setMapReady] = useState(false);
   const [baseLayer, setBaseLayer] = useState<'chart' | 'satellite'>('chart');
   const [zoom, setZoom] = useState(INITIAL_VIEW.zoom);
 
@@ -105,7 +110,7 @@ export const RouteMap = () => {
   const [dataVersion, setDataVersion] = useState(0);
 
   // PHASE 3.2: Map not drawing notice state
-  const [mapHealth, setMapHealth] = useState<{ styleLoaded: boolean; visibleLayers: number; canvasOk: boolean } | null>(null);
+  const [mapHealth, setMapHealth] = useState<{ styleLoaded: boolean; visibleLayers: number; canvasOk: boolean; overlayAttached?: boolean } | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
   // R9: Camera interaction latch - once user moves camera, automatic moves are disabled
@@ -117,7 +122,11 @@ export const RouteMap = () => {
     if (isStableRef.current) return;
     isStableRef.current = true;
 
-    loadLandGeometry().then(() => {
+    // isLoaded gates the deck overlay and every layer, so it must flip even when
+    // the coastline fetch fails: an unhandled rejection here used to leave the
+    // map permanently black with no diagnostics. Land is skipped (the layer gate
+    // also checks land110m/land50m), vessels and ports still draw.
+    const startSim = () => {
       setIsLoaded(true);
       setDataVersion(v => v + 1); // Trigger layer rebuild after data loads
       // Pre-seed trails - NEVER reset count here; SimEngine manages count
@@ -125,6 +134,10 @@ export const RouteMap = () => {
       engine.preseedTrails();
       engine.start();
       console.log('SEEDED', fleetBuffers.count, 'vessels');
+    };
+    loadLandGeometry().then(startSim).catch((err) => {
+      console.error('[MAP] land geometry failed to load - continuing without coastlines', err);
+      startSim();
     });
 
     // Visibility change handler
@@ -138,10 +151,30 @@ export const RouteMap = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Boot watchdog: if the deck overlay never attached, nothing below ever writes
+  // mapHealth, so the map used to fail completely silently — black canvas, live
+  // chrome, no notice. One shot, dev only, same gate as the notice itself.
+  useEffect(() => {
+    if (!import.meta.env.DEV) return;
+    const t = setTimeout(() => {
+      if (overlayRef.current) return;
+      console.error('[MAP] deck overlay never attached', { isLoaded, mapReady, hasMapRef: !!mapRef.current });
+      const rect = mapRef.current?.getMap()?.getCanvas()?.getBoundingClientRect();
+      setMapHealth({
+        styleLoaded: !!mapRef.current?.getMap()?.isStyleLoaded(),
+        visibleLayers: 0,
+        canvasOk: !!(rect && rect.width > 10 && rect.height > 10),
+        overlayAttached: false,
+      });
+    }, 6000);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // Deck init - runs when map becomes available
   const mapReadyRef = useRef(false);
   useEffect(() => {
-    if (!mapRef.current || mapReadyRef.current || !isLoaded) return;
+    if (!mapRef.current || mapReadyRef.current || !isLoaded || !mapReady) return;
     mapReadyRef.current = true;
 
     const map = mapRef.current.getMap();
@@ -220,8 +253,12 @@ export const RouteMap = () => {
       map.off('idle', refreshMapState);
       map.off('styledata', refreshMapState);
       overlay.finalize();
+      overlayRef.current = null;
+      // The overlay is gone, so the latch has to open or a remount (StrictMode,
+      // HMR) would skip re-creating it and leave the map blank.
+      mapReadyRef.current = false;
     };
-  }, [mapRef.current]);
+  }, [isLoaded, mapReady]);
 
   // Helper: read zoom from map for layer decisions (never state)
   const getMapZoom = () => mapRef.current?.getMap()?.getZoom() ?? INITIAL_VIEW.zoom;
@@ -504,7 +541,7 @@ export const RouteMap = () => {
     // visibleLayers is read from the overlay closure and is unreliable (reads 0
     // when the overlay ref is momentarily null), so it is shown for info only and
     // no longer gates this blocking notice — canvas + style are the real signals.
-    const isNotDrawing = !mapHealth.canvasOk || !mapHealth.styleLoaded;
+    const isNotDrawing = !mapHealth.canvasOk || !mapHealth.styleLoaded || mapHealth.overlayAttached === false;
     if (!isNotDrawing) return null;
 
     return (
@@ -520,6 +557,7 @@ export const RouteMap = () => {
           <div style={{ fontSize: 14, marginBottom: 12 }}>
             <div>Canvas OK: {mapHealth.canvasOk ? '✓' : '✗ FAIL'}</div>
             <div>Style Loaded: {mapHealth.styleLoaded ? '✓' : '✗ FAIL'}</div>
+            {mapHealth.overlayAttached === false && <div>Deck Overlay: ✗ NEVER ATTACHED</div>}
             <div>Visible Layers: {mapHealth.visibleLayers === 0 ? '✗ 0' : mapHealth.visibleLayers}</div>
           </div>
           <button
@@ -546,6 +584,7 @@ export const RouteMap = () => {
         initialViewState={INITIAL_VIEW}
         mapStyle={currentStyle}
         style={{ width: '100%', height: '100%' }}
+        onLoad={() => setMapReady(true)}
         onMouseMove={handleMouseMove}
         attributionControl={false}
         antialias={false}

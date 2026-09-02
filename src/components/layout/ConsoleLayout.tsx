@@ -65,8 +65,8 @@ function ConsoleLayout() {
         </button>
       )}
 
-      {/* Main Content Area */}
-      <div className="flex-1 flex overflow-hidden">
+      {/* Main Content Area — `relative` anchors the panels' narrow-width drawers. */}
+      <div className="relative flex-1 flex overflow-hidden">
         {/* Left Panel: Layers & Data */}
         <ResizablePanel
           side="left"

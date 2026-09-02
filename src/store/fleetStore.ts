@@ -133,11 +133,12 @@ export const useFleetStore = create<FleetState>()((set, get) => ({
   },
 }));
 
-// Selector helpers
-export const getVesselList = (state: FleetState): VesselState[] => {
-  return Object.values(state.vessels);
-};
-
+// Selector helpers.
+//
+// Anything derived here must return a value that is stable between reads:
+// zustand compares snapshots by reference, so a helper that allocates (an
+// `Object.values`, a `.map`, an object literal) makes React re-render forever.
+// Derive those in the component with `useShallow` instead — see VesselAnalysis.
 export const getSelectedVessel = (state: FleetState): VesselState | null => {
   return state.selectedMmsi ? state.vessels[state.selectedMmsi] : null;
 };
